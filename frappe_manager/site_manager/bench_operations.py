@@ -26,7 +26,7 @@ from frappe_manager.utils.site import get_all_docker_images
 class BenchOperations:
     def __init__(self, bench) -> None:
         self.bench = bench
-        self.bench_cli_cmd = ["/opt/.pyenv/shims/bench"]
+        self.bench_cli_cmd = ['/opt/user/.bin/bench_orig']
         self.frappe_bench_dir: Path = self.bench.path / "workspace" / "frappe-bench"
 
     def create_fm_bench(self):
@@ -189,6 +189,8 @@ class BenchOperations:
 
         if self.frappe_bench_dir.is_symlink():
             handle_symlink_frappe_dir = True
+            symlink_target = str(self.frappe_bench_dir.readlink())
+            symlink_name = self.frappe_bench_dir.name
 
         for section_name in config.sections():
             if "group:" not in section_name:
