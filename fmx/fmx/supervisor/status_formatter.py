@@ -27,16 +27,14 @@ def create_process_details_table(process_info: Dict[str, Any], verbose: bool = F
     table.add_column(style="dim", justify="right")
     table.add_column()
 
-    # Only show details if verbose is True
     if not verbose:
-        return table # Return empty table if not verbose
+        return table
 
-    # Define verbose fields
     fields_to_display = [
         ("group", "Group"),
-        ("start", "Start Time"), # Keep start/stop time in verbose
+        ("start", "Start Time"),
         ("stop", "Stop Time"),
-        ("now", "Server Time"), # Keep server time in verbose
+        ("now", "Server Time"),
         ("spawnerr", "Spawn Error"),
         ("exitstatus", "Exit Status"),
         ("stdout_logfile", "Stdout Log"),
@@ -46,17 +44,14 @@ def create_process_details_table(process_info: Dict[str, Any], verbose: bool = F
 
     for field, label in fields_to_display:
         value = process_info.get(field)
-        # Special handling for PID 0 and Exit Status when running
         if field == 'pid' and value == 0:
             value = "N/A (Not Running)"
         elif field == 'exitstatus' and process_info.get('statename') == 'RUNNING':
-            continue # Don't show exit status for running processes
+            continue
         elif field in ['start', 'stop', 'now']:
             value = format_timestamp(value)
 
-        # Only add row if value exists (or for specific fields like PID/Exit Status)
         if value is not None or field in ['pid', 'exitstatus']:
-             # Ensure value is a string for the table
              table.add_row(f"{label}:", str(value))
 
     return table
@@ -82,14 +77,14 @@ def format_service_info(service_name: str, process_info_list: list, verbose: boo
 
         # Rearrange the elements: PID, Status, then Process Name
         process_tree = root.add(
-            f"([dim]PID: {process.get('pid', 0) or 'N/A'}[/dim]) " # PID first
-            f"([{state_color}]{state}[/{state_color}]) " # Status second 
-            f"[b cyan]Process:[/b cyan] [b]{process_name}[/b]" # Process name last
+            f"([dim]PID: {process.get('pid', 0) or 'N/A'}[/dim]) "
+            f"([{state_color}]{state}[/{state_color}]) "
+            f"[b cyan]Process:[/b cyan] [b]{process_name}[/b]"
         )
         
-        # Pass the verbose flag here
         details_table = create_process_details_table(process, verbose=verbose)
         if details_table.row_count > 0:
             process_tree.add(details_table)
+
 
     return root

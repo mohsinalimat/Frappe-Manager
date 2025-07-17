@@ -2,7 +2,6 @@ from typing import List, Tuple, Optional, Dict
 from .display import DisplayManager
 from .supervisor.connection import FM_SUPERVISOR_SOCKETS_DIR
 
-# Standard messages for consistent output
 MESSAGES: Dict[str, str] = {
     "NO_SERVICES_FOUND": "No supervisord services found to {action}.",
     "SOCKET_DIR_INFO": f"Looked for socket files in: {FM_SUPERVISOR_SOCKETS_DIR}",
@@ -44,7 +43,6 @@ def validate_services(
         display.print(MESSAGES["AVAILABLE_SERVICES"].format(services_list=', '.join(all_services) or 'None'))
         return False, None
 
-    # Create consistent target description
     target_desc = "all services" if len(services_to_target) == len(all_services) else \
                  f"service(s): {display.highlight(', '.join(services_to_target))}"
     

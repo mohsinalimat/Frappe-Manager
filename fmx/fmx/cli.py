@@ -94,12 +94,10 @@ def _run_parallel_tasks(services: List[str], command_func, action_verb: str, sho
         if show_progress and progress:
             task_id = progress.add_task(f"{action_verb.capitalize()} services...", total=len(services))
 
-        # Submit all tasks
         for service in services:
             future = executor.submit(command_func, service, **kwargs)
             futures[future] = service
 
-        # Collect results
         for future in as_completed(futures):
             service = futures[future]
             try:

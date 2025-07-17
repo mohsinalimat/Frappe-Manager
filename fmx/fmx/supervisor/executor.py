@@ -1,8 +1,6 @@
 import socket
-import signal
-from typing import Optional, List, Any, Dict
+from typing import Optional, List, Any
 from xmlrpc.client import ProtocolError
-
 from .exceptions import SupervisorConnectionError
 from .connection import check_supervisord_connection
 from .actions import _handle_stop, _handle_start, _handle_restart, _handle_info, _handle_signal, _handle_signal_workers

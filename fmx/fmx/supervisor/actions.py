@@ -6,7 +6,6 @@ from xmlrpc.client import Fault
 logger = logging.getLogger(__name__)
 
 from .constants import STOPPED_STATES, is_worker_process, SIGNAL_NUM_WORKER_GRACEFUL_EXIT
-from .exceptions import SupervisorOperationFailedError
 from ..display import display
 from .fault_handler import _raise_exception_from_fault
 from .stop_helpers import _stop_single_process_with_logic

@@ -14,7 +14,6 @@ def _raise_exception_from_fault(e: Fault, service_name: str, action: str, proces
     fault_code = getattr(e, 'faultCode', None)
     fault_string = getattr(e, 'faultString', 'Unknown Fault')
 
-    # Map fault strings/codes to specific exceptions
     if "BAD_NAME" in fault_string:
         raise ProcessNotFoundError(f"Process not found: {fault_string}", service_name, process_name, e)
     elif "NOT_RUNNING" in fault_string:
@@ -29,7 +28,5 @@ def _raise_exception_from_fault(e: Fault, service_name: str, action: str, proces
          raise SupervisorOperationFailedError(f"Action failed: {fault_string}", service_name, process_name, e)
     elif "SHUTDOWN_STATE" in fault_string:
         raise SupervisorConnectionError(f"Supervisor is shutting down", service_name, process_name, e) # Treat as connection issue
-    # Add more specific mappings here if needed
     else:
-        # Generic fallback
         raise SupervisorOperationFailedError(f"Supervisor Fault {fault_code or 'N/A'}: '{fault_string}'", service_name, process_name, e)

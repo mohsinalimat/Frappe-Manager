@@ -1,4 +1,3 @@
-import sys
 from typing import Optional, Any
 import typer
 from rich.console import Console
