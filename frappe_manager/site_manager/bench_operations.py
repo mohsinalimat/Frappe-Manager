@@ -203,27 +203,20 @@ class BenchOperations:
 
                     if "frappe-web" in section_name:
                         if key == "command":
-                            # Replace localhost binding with all interfaces
                             value = value.replace("127.0.0.1:80", "0.0.0.0:80")
                             
-                            # Calculate optimal workers based on CPU count
                             workers = (os.cpu_count() * 2) + 1
                             
-                            # Replace worker count using regex
                             value = re.sub(r'-w\s+\d+', f'-w {workers}', value)
                             
                     section_config.set(section_name, key, value)
 
                 section_name_delimeter = '-frappe-'
-
                 if '-node-' in section_name:
                     section_name_delimeter = '-node-'
 
-                file_name_prefix = section_name.split(section_name_delimeter)
-
-                file_name_prefix = file_name_prefix[-1]
+                file_name_prefix = section_name.split(section_name_delimeter)[-1]
                 file_name = file_name_prefix + ".fm.supervisor.conf"
-
                 if "worker" in section_name:
                     file_name = file_name_prefix + ".workers.fm.supervisor.conf"
 
