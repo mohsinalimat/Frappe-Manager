@@ -50,7 +50,7 @@ def command(
     ] = False,
 ):
     """Start services or specific processes."""
-    # Get display manager from context dictionary
+
     display: DisplayManager = ctx.obj['display']
 
     all_services = get_service_names_for_completion()
@@ -62,13 +62,11 @@ def command(
 
     process_desc = get_process_description(display, process_name)
 
-    # Determine description based on whether specific processes are targeted
     if process_name:
         process_desc = f"specific process(es): {display.highlight(', '.join(process_name))}"
     else:
         process_desc = "all defined processes"
 
-    # Add wait information to the message
     wait_desc = "(with wait)" if wait else "(without wait)"
     display.print(f"\nStarting {process_desc} in {target_desc} {wait_desc}...")
 

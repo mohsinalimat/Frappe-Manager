@@ -1,18 +1,15 @@
-import sys
 from typing import Annotated, Optional, List
 
 import typer
 from ..display import DisplayManager
-from ..command_utils import validate_services, get_process_description
+from ..command_utils import validate_services
 
 from ..cli import (
     ServiceNameEnumFactory,
     execute_parallel_command,
-    get_service_names_for_completion,
-    _cached_service_names,
+    get_service_names_for_completion
 )
 from ..supervisor.api import get_service_info as util_get_service_info
-from ..supervisor.connection import FM_SUPERVISOR_SOCKETS_DIR
 
 command_name = "status"
 
@@ -37,7 +34,6 @@ def command(
     ] = False,
 ):
     """Show detailed status of services."""
-    # Get display manager from context dictionary
     display: DisplayManager = ctx.obj['display']
 
     all_services = get_service_names_for_completion()

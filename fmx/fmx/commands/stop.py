@@ -61,7 +61,6 @@ def command(
 
     process_desc = get_process_description(display, process_name)
 
-    # Add wait information to the message
     wait_desc = "(with wait)" if wait else "(without wait)"
 
     display.print(f"\nAttempting to stop {process_desc} in {target_desc} {wait_desc}...")
