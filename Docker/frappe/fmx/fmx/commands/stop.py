@@ -1,24 +1,22 @@
-from typing import Annotated, Optional, List
-
+from typing import Annotated, List, Optional
 import typer
-from ..display import DisplayManager
-from ..command_utils import validate_services, get_process_description
-from ..cli import (
+from fmx.cli import (
     ServiceNameEnumFactory,
     execute_parallel_command,
     get_service_names_for_completion,
 )
-from ..supervisor.api import start_service as util_start_service
+from fmx.command_utils import get_process_description, validate_services
+from fmx.display import DisplayManager
+from fmx.supervisor import stop_service as util_stop_service
 
-command_name = "start"
+command_name = "stop"
 
 ServiceNamesEnum = ServiceNameEnumFactory()
-
 
 def command(
     ctx: typer.Context,
     service_names: Annotated[
-        Optional[List[ServiceNamesEnum]], 
+        Optional[List[ServiceNamesEnum]],
         typer.Argument(
             help="Name(s) of the service(s) to target. If omitted, targets ALL running services.",
             autocompletion=get_service_names_for_completion,
@@ -26,11 +24,10 @@ def command(
         )
     ] = None,
     process_name: Annotated[
-        Optional[List[str]], 
+        Optional[List[str]],
         typer.Option(
-            "--process",
-            "-p",
-            help="Target only specific process(es). If omitted, attempts to start ALL defined processes in the service.",
+            "--process", "-p",
+            help="Target only specific process(es) within the selected service(s). Use multiple times for multiple processes (e.g., -p worker_short -p worker_long).",
             show_default=False,
         )
     ] = None,
@@ -41,43 +38,38 @@ def command(
             help="Wait for supervisor start/stop operations to complete before returning.",
         )
     ] = True,
-    verbose: Annotated[
-        bool,
+    wait_workers: Annotated[
+        Optional[bool],
         typer.Option(
-            "--verbose", "-v",
-            help="Show detailed process identification and skipping messages during start.",
+            "--wait-workers/--no-wait-workers",
+            help="Wait for processes identified as workers to stop gracefully (use if default stop times out workers).",
+            show_default=False,
         )
-    ] = False,
+    ] = None,
 ):
-    """Start services or specific processes."""
-
+    """Stop services or specific processes."""
     display: DisplayManager = ctx.obj['display']
 
     all_services = get_service_names_for_completion()
     services_to_target = all_services if not service_names else [s.value for s in service_names]
 
-    valid, target_desc = validate_services(display, services_to_target, all_services, "start")
+    valid, target_desc = validate_services(display, services_to_target, all_services, "stop")
     if not valid:
         return
 
     process_desc = get_process_description(display, process_name)
 
-    if process_name:
-        process_desc = f"specific process(es): {display.highlight(', '.join(process_name))}"
-    else:
-        process_desc = "all defined processes"
-
     wait_desc = "(with wait)" if wait else "(without wait)"
-    display.print(f"\nStarting {process_desc} in {target_desc} {wait_desc}...")
 
+    display.print(f"\nAttempting to stop {process_desc} in {target_desc} {wait_desc}...")
     execute_parallel_command(
         services_to_target,
-        util_start_service,
-        action_verb="starting",
+        util_stop_service,
+        action_verb="stopping",
         show_progress=True,
         process_name_list=process_name,
         wait=wait,
-        verbose=verbose
+        wait_workers=wait_workers
     )
 
-    display.print("\nStart sequence complete.")
+    display.print("\nStop sequence complete.")

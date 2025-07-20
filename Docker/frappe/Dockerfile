@@ -123,22 +123,25 @@ COPY --chown=frappe:frappe ./zshrc /opt/user/.zshrc
 COPY --chown=frappe:frappe ./fm.zsh-theme /opt/user/fm.zsh-theme
 
 RUN git clone --depth 1 https://github.com/pyenv/pyenv.git .pyenv \
-    # support previous version
     && pyenv install $PYTHON_VERSION 3.11.0 \
     && PYENV_VERSION=$PYTHON_VERSION pip install --no-cache-dir virtualenv \
     && pyenv global $PYTHON_VERSION \
     && echo 'export PYENV_ROOT="/opt/.pyenv"' >> "$USERZSHRC" \
     && echo 'command -v pyenv >/dev/null || export PATH="$PYENV_ROOT/bin:$PATH"' >> "$USERZSHRC" \
     && echo 'eval "$(pyenv init --path)"' >>"$USERZSHRC" \
-    # remove *.pyc and *.pyo as used here in official docker image to reduce size
-    # https://github.com/docker-library/python/blob/789d789e4a8db71d3d393667971c49b845ffdc3f/3.11/alpine3.19/Dockerfile#L106-L111
     && find /opt/.pyenv/versions -depth \( \( -type d -a \( -name test -o -name tests -o -name idle_test \) \) -o \( -type f -a \( -name '*.pyc' -o -name '*.pyo' -o -name 'libpython*.a' \) \) \) -exec rm -rf '{}' + ;
+
+
+COPY --chown=frappe:frappe ./fmx /opt/user/fmx
 
 RUN mkdir -p /opt/user/.bin /opt/user/conf.d \
     && python -m venv /opt/user/bench-venv \
-    && /opt/user/bench-venv/bin/pip install frappe-bench \
+    && /opt/user/bench-venv/bin/pip install frappe-bench /opt/user/fmx \
+    && rm -rf /opt/user/fmx \
     && chown -R frappe:frappe /opt/user/bench-venv \
-    && ln -s /opt/user/bench-venv/bin/bench /opt/user/.bin/bench_orig
+    && ln -s /opt/user/bench-venv/bin/bench /opt/user/.bin/bench_orig \
+    && ln -s /opt/user/bench-venv/bin/fmx /opt/user/.bin/fmx
+
 
 RUN mkdir -p /opt/.nvm \
     && wget -qO- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.0/install.sh | bash \
@@ -182,7 +185,6 @@ COPY --from=prebake --chown=frappe:frappe /workspace/hrms /workspace/frappe-benc
 
 FROM bench AS fm_image
 
-# Detect arch and install wkhtmltopdf
 ENV WKHTMLTOPDF_VERSION=0.12.6.1-3
 RUN if [ "$(uname -m)" = "aarch64" ]; then export ARCH=arm64; fi \
     && if [ "$(uname -m)" = "x86_64" ]; then export ARCH=amd64; fi \
@@ -205,17 +207,5 @@ WORKDIR /workspace
 COPY --from=prebake --chown=frappe:frappe /opt/.pyenv /opt/.pyenv
 COPY --from=prebake --chown=frappe:frappe /opt/.nvm /opt/.nvm
 COPY --from=prebake --chown=frappe:frappe /opt/user /opt/user
-
-COPY --chown=frappe:frappe ./fm_helper.py /opt/user/
-
-RUN $PYENV_ROOT/versions/$PYTHON_VERSION/bin/python -m venv /opt/venv && \
-    mkdir -p /opt/build && \
-    cd /opt/build && \
-    . /opt/venv/bin/activate && \
-    pip install --no-cache-dir rich pyinstaller supervisor typer && \
-    pyinstaller --onefile --hidden-import __future__ --name fm-helper --distpath /opt/user/.bin /opt/user/fm_helper.py && \
-    deactivate && \
-    rm -rf /opt/user/fm_helper.py && \
-    rm -rf /opt/venv build /opt/build
 
 ENTRYPOINT ["/bin/bash","/entrypoint.sh"]

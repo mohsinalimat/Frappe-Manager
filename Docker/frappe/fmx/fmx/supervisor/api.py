@@ -2,15 +2,15 @@ import logging
 from typing import List, Optional, Dict, Any
 from pathlib import Path
 from rich.tree import Tree
-from ..display import display
+from fmx.display import display
 
 logger = logging.getLogger(__name__)
 
-from .executor import execute_supervisor_command, check_supervisord_connection
-from .constants import SIGNAL_NUM_WORKER_GRACEFUL_EXIT
-from .connection import FM_SUPERVISOR_SOCKETS_DIR
-from .status_formatter import format_service_info
-from .exceptions import SupervisorError, SupervisorConnectionError
+from fmx.supervisor.executor import execute_supervisor_command, check_supervisord_connection
+from fmx.supervisor.constants import SIGNAL_NUM_WORKER_GRACEFUL_EXIT
+from fmx.supervisor.connection import FM_SUPERVISOR_SOCKETS_DIR
+from fmx.supervisor.status_formatter import format_service_info
+from fmx.supervisor.exceptions import SupervisorError, SupervisorConnectionError
 
 
 def get_service_names() -> List[str]:

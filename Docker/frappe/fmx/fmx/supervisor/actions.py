@@ -5,11 +5,11 @@ from xmlrpc.client import Fault
 
 logger = logging.getLogger(__name__)
 
-from .constants import STOPPED_STATES, is_worker_process, SIGNAL_NUM_WORKER_GRACEFUL_EXIT
-from ..display import display
-from .fault_handler import _raise_exception_from_fault
-from .stop_helpers import _stop_single_process_with_logic
-from ..display import display
+from fmx.supervisor.constants import STOPPED_STATES, is_worker_process, SIGNAL_NUM_WORKER_GRACEFUL_EXIT
+from fmx.display import display
+from fmx.supervisor.fault_handler import _raise_exception_from_fault
+from fmx.supervisor.stop_helpers import _stop_single_process_with_logic
+from fmx.display import display
 
 
 def _handle_stop(

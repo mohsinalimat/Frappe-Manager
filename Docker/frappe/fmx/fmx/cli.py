@@ -12,9 +12,9 @@ from rich.progress import Progress, SpinnerColumn, TextColumn
 from rich.tree import Tree
 import typer
 
-from . import commands as commands_package
-from .display import DisplayManager, display
-from .supervisor import (
+from fmx import commands as commands_package
+from fmx.display import DisplayManager, display
+from fmx.supervisor import (
     FM_SUPERVISOR_SOCKETS_DIR,
     get_service_info as util_get_service_info,
     get_service_names as util_get_service_names,

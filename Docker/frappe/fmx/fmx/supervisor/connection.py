@@ -1,10 +1,9 @@
 import os
-import time
 import socket
 from pathlib import Path
 from xmlrpc.client import ServerProxy, Fault, ProtocolError
 import supervisor.xmlrpc as sxml
-from .exceptions import SupervisorConnectionError
+from fmx.supervisor.exceptions import SupervisorConnectionError
 
 FM_SUPERVISOR_SOCKETS_DIR = Path(
     os.environ.get("SUPERVISOR_SOCKET_DIR", "/fm-sockets")

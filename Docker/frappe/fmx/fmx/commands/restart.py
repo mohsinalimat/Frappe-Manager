@@ -3,19 +3,16 @@ import subprocess
 import sys
 import time
 from typing import Annotated, Optional, List
-
 import typer
-
-from ..rq_controller import control_rq_workers, check_rq_suspension, wait_for_rq_workers_suspended, ActionEnum
-from ..display import DisplayManager
-from ..command_utils import validate_services
-from ..cli import ServiceNameEnumFactory, execute_parallel_command, get_service_names_for_completion
-from ..supervisor.api import (
+from fmx.rq_controller import control_rq_workers, check_rq_suspension, wait_for_rq_workers_suspended, ActionEnum
+from fmx.display import DisplayManager
+from fmx.command_utils import validate_services
+from fmx.cli import ServiceNameEnumFactory, execute_parallel_command, get_service_names_for_completion
+from fmx.supervisor.api import (
     signal_service_workers as util_signal_service_workers,
     stop_service as util_stop_service,
     start_service as util_start_service
 )
-
 
 command_name = "restart"
 
@@ -300,13 +297,6 @@ def command(
             help="Timeout (seconds) after which stubborn non-worker processes will be forcefully killed during restart.",
         ),
     ] = None,
-    wait_after_signal_timeout: Annotated[
-        int,
-        typer.Option(
-            "--wait-after-signal-timeout",
-            help="Timeout (seconds) for waiting after signaling workers (default: 60).",
-        ),
-    ] = 60,
 ):
     """Restart services with optional RQ worker coordination and migration.
 

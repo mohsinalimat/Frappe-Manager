@@ -69,13 +69,6 @@ DEFAULT_EXTENSIONS = [
     # JavaScript/Web
     "dbaeumer.vscode-eslint",
     "esbenp.prettier-vscode",
-
-    # General Development
-    "eamodio.gitlens",
-    "MS-vsliveshare.vsliveshare",
-    "visualstudioexptteam.vscodeintellicode",
-    "christian-kohler.path-intellisense",
-    "streetsidesoftware.code-spell-checker",
 ]
 
 

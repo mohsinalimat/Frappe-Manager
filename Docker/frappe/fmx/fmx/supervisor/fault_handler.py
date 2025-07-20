@@ -1,7 +1,7 @@
 from typing import Optional
 from xmlrpc.client import Fault
 
-from .exceptions import (
+from fmx.supervisor.exceptions import (
     SupervisorConnectionError,
     ProcessNotFoundError,
     ProcessNotRunningError,

@@ -1,10 +1,10 @@
 import socket
 from typing import Optional, List, Any
 from xmlrpc.client import ProtocolError
-from .exceptions import SupervisorConnectionError
-from .connection import check_supervisord_connection
-from .actions import _handle_stop, _handle_start, _handle_restart, _handle_info, _handle_signal, _handle_signal_workers
-from .constants import SIGNAL_NUM_WORKER_GRACEFUL_EXIT
+from fmx.supervisor.exceptions import SupervisorConnectionError
+from fmx.supervisor.connection import check_supervisord_connection
+from fmx.supervisor.actions import _handle_stop, _handle_start, _handle_restart, _handle_info, _handle_signal, _handle_signal_workers
+from fmx.supervisor.constants import SIGNAL_NUM_WORKER_GRACEFUL_EXIT
 
 
 def _get_validated_supervisor_api(service_name: str):

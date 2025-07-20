@@ -41,7 +41,4 @@ DIRSTACKSIZE=5
 # Auto update Oh My ZSH without asking for confirmation
 DISABLE_UPDATE_PROMPT=true
 
-# aliases
-alias fm='/opt/.pyenv/shims/bench'
-alias fm='/opt/.pyenv/shims/bench'
 [[ -f ~/.zsh_aliases ]] && source ~/.zsh_aliases

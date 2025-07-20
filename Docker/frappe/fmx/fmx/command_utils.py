@@ -1,6 +1,6 @@
 from typing import List, Tuple, Optional, Dict
-from .display import DisplayManager
-from .supervisor.connection import FM_SUPERVISOR_SOCKETS_DIR
+from fmx.display import DisplayManager
+from fmx.supervisor.connection import FM_SUPERVISOR_SOCKETS_DIR
 
 MESSAGES: Dict[str, str] = {
     "NO_SERVICES_FOUND": "No supervisord services found to {action}.",
