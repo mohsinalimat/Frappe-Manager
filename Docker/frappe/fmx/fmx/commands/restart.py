@@ -2,7 +2,9 @@ import os
 import subprocess
 import sys
 import time
-from typing import Annotated, Optional, List
+import json
+from pathlib import Path
+from typing import Annotated, Optional, List, Any
 import typer
 from fmx.rq_controller import control_rq_workers, check_rq_suspension, wait_for_rq_workers_suspended, ActionEnum
 from fmx.display import DisplayManager
@@ -14,9 +16,48 @@ from fmx.supervisor.api import (
     start_service as util_start_service
 )
 
+def _set_common_site_config_key_value(key_name: str, value: Any, verbose: bool = False):
+    """Set a specific key's value in common_site_config.json."""
+    common_config_path = Path("/workspace/frappe-bench/sites/common_site_config.json")
+    config = {}
+    try:
+        if common_config_path.exists():
+            with open(common_config_path, 'r') as f:
+                try:
+                    config = json.load(f)
+                except json.JSONDecodeError:
+                    config = {}
+        config[key_name] = value
+        with open(common_config_path, 'w') as f:
+            json.dump(config, f, indent=4)
+        if verbose:
+            print(f"[dim]Set {key_name} to {value} in {common_config_path}[/dim]")
+        return True
+    except Exception as e:
+        if verbose:
+            print(f"[yellow]Warning:[/yellow] Could not write {key_name} to {common_config_path}: {e}")
+        return False
+
 command_name = "restart"
 
 ServiceNamesEnum = ServiceNameEnumFactory()
+
+
+def enable_maintenance_mode(display: DisplayManager):
+    display.print("[yellow]Enabling maintenance mode...[/yellow]")
+    if _set_common_site_config_key_value("maintenance_mode", 1):
+        display.success("Maintenance mode enabled.")
+    else:
+        display.error("Failed to enable maintenance mode in common_site_config.json.")
+        raise typer.Exit(code=1)
+
+def disable_maintenance_mode(display: DisplayManager):
+    display.print("[yellow]Disabling maintenance mode...[/yellow]")
+    if _set_common_site_config_key_value("maintenance_mode", 0):
+        display.success("Maintenance mode disabled.")
+    else:
+        display.error("Failed to disable maintenance mode in common_site_config.json.")
+        # Do not exit, just warn
 
 
 def _suspend_rq_workers(
@@ -297,15 +338,36 @@ def command(
             help="Timeout (seconds) after which stubborn non-worker processes will be forcefully killed during restart.",
         ),
     ] = None,
+    maintenance_mode: Annotated[
+        Optional[List[str]],
+        typer.Option(
+            "--maintenance-mode",
+            help="Enable maintenance mode for selected phases. Accepts a space separated list: stop migrate start.",
+            show_default=False,
+        ),
+    ] = None,
 ):
-    """Restart services with optional RQ worker coordination and migration.
+    """
+    Restart services with optional RQ worker coordination, migration, and maintenance mode.
 
     Performs supervisor-based restart with optional Redis worker suspension.
     Can run bench migrate between stop and start phases.
     Can wait for workers to complete jobs or signal them for graceful shutdown.
     Always attempts to resume workers after restart completion.
+
+    Maintenance mode can be enabled for any combination of phases (stop, migrate, restart)
+    using --maintenance-mode. Example: --maintenance-mode stop,migrate
     """
     display: DisplayManager = ctx.obj['display']
+
+    valid_phases = {"stop", "migrate", "start"}
+    maintenance_phases = set(maintenance_mode or [])
+    if not maintenance_phases.issubset(valid_phases):
+        display.error(
+            f"Invalid value(s) for --maintenance-mode: {', '.join(maintenance_phases - valid_phases)}. "
+            f"Allowed values: stop, migrate, start."
+        )
+        raise typer.Exit(code=1)
 
     all_services = get_service_names_for_completion()
     services_to_target = all_services if not service_names else [s.value for s in service_names]
@@ -318,17 +380,22 @@ def command(
     display.print(f"\nAttempting to restart {target_desc} {wait_desc}...")
 
     suspension_needed = suspend_rq or (wait_workers is True)
-    if suspension_needed:
-        if not _suspend_rq_workers(
-            display, wait_workers, wait_workers_timeout, wait_workers_poll, wait_workers_verbose
-        ):
-            raise typer.Exit(code=1)
-
-    if wait_workers is False:
-        _signal_workers_for_graceful_shutdown(display, services_to_target)
-
-    resume_called = False
+    maintenance_enabled = False
     try:
+        # ---- STOP PHASE ----
+        if "stop" in maintenance_phases:
+            enable_maintenance_mode(display)
+            maintenance_enabled = True
+
+        if suspension_needed:
+            if not _suspend_rq_workers(
+                display, wait_workers, wait_workers_timeout, wait_workers_poll, wait_workers_verbose
+            ):
+                raise typer.Exit(code=1)
+
+        if wait_workers is False:
+            _signal_workers_for_graceful_shutdown(display, services_to_target)
+
         execute_parallel_command(
             services_to_target,
             util_stop_service,
@@ -340,10 +407,29 @@ def command(
             force_kill_timeout=force_kill_timeout,
         )
 
+        # Disable maintenance mode if not needed for next phase
+        if "stop" in maintenance_phases and "migrate" not in maintenance_phases:
+            disable_maintenance_mode(display)
+            maintenance_enabled = False
+
+        # ---- MIGRATE PHASE ----
         if migrate:
+            if "migrate" in maintenance_phases and not maintenance_enabled:
+                enable_maintenance_mode(display)
+                maintenance_enabled = True
+
             if not _run_migration(display, migrate_timeout):
                 display.error("Migration failed. Aborting restart - services remain stopped.")
                 raise typer.Exit(code=1)
+
+            if "migrate" in maintenance_phases and "restart" not in maintenance_phases:
+                disable_maintenance_mode(display)
+                maintenance_enabled = False
+
+        # ---- START PHASE ----
+        if "start" in maintenance_phases and not maintenance_enabled:
+            enable_maintenance_mode(display)
+            maintenance_enabled = True
 
         execute_parallel_command(
             services_to_target,
@@ -355,8 +441,8 @@ def command(
         )
 
     finally:
-        if suspension_needed and not resume_called:
+        if suspension_needed:
             _resume_rq_workers(display)
-            resume_called = True
-
+        if maintenance_enabled:
+            disable_maintenance_mode(display)
         display.print("\nRestart sequence complete.")

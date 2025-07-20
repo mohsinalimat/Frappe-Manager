@@ -20,7 +20,7 @@ from rq import Queue
 from rq.suspension import is_suspended, resume, suspend
 from rq.worker import Worker
 
-def _get_site_config_key_value(key_name: str, default: Optional[Any] = None, verbose: bool = False) -> Optional[Any]:
+def _get_common_site_config_key_value(key_name: str, default: Optional[Any] = None, verbose: bool = False) -> Optional[Any]:
     """Read a specific key's value from common_site_config.json.
 
     Args:
@@ -58,7 +58,7 @@ def _get_site_config_key_value(key_name: str, default: Optional[Any] = None, ver
 
 def _get_redis_connection():
     """Get Redis connection from common_site_config.json"""
-    redis_url = _get_site_config_key_value("redis_queue", verbose=False)
+    redis_url = _get_common_site_config_key_value("redis_queue", verbose=False)
     if not redis_url:
         print("[bold red]Error:[/bold red] 'redis_queue' URL not found in common_site_config.json.", file=sys.stderr)
         return None
