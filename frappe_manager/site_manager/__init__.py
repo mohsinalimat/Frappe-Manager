@@ -70,7 +70,7 @@ VSCODE_TASKS_JSON = {
             "label": "fm-kill-port",
             "type": "shell",
             "command": "/bin/bash",
-            "args": ["-c", "fm-helper stop frappe && sleep 2"],
+            "args": ["-c", "fmx stop frappe && sleep 2"],
             "presentation": {"reveal": "never", "panel": "dedicated"},
             "options": {"ignoreExitCode": True},
             "problemMatcher": [],

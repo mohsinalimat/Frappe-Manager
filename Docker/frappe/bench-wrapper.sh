@@ -20,11 +20,12 @@
 #   - Establishes signal handlers
 #
 # Monitor Mode (--monitor):
-#   - Triggered by Signal 34
-#   - Performs process detachment
+#   - Internal mode, not for direct user invocation
+#   - Launched automatically by the wrapper when detaching from supervisor (after Signal 34)
+#   - Disowns the worker process
 #   - Implements 3-second grace period
-#   - Sends TERM signal to process group
-#   - Tracks child process changes
+#   - Sends TERM signal to the worker process group
+#   - Monitors worker and child processes until exit
 #   - Logs state transitions
 #
 # 2. Signal Management
@@ -45,12 +46,12 @@
 #
 # Detachment Sequence:
 #   1. Receive Signal 34
-#   2. Fork monitor process
-#   3. Setup stream redirection
-#   4. Detach from supervisor
-#   5. Wait 3 seconds
-#   6. Send TERM to process group
-#   7. Monitor until completion
+#   2. Forks a monitor process (`bench-wrapper.sh --monitor <worker-pid>`)
+#   3. Monitor process sets up stream redirection and disowns worker
+#   4. Monitor process detaches from supervisor
+#   5. Waits 3 seconds
+#   6. Sends TERM to worker process group
+#   7. Monitors worker and children until all exit
 #
 # Logging
 # =======
@@ -77,6 +78,8 @@
 # Monitor Status:
 #   tail -f /tmp/bench.log
 #
+# Note: The --monitor mode is used internally by the wrapper and should not be invoked directly by users.
+#
 # Implementation Notes
 # ==================
 # - Uses setsid for process group management
@@ -92,16 +95,17 @@
 # - Reports worker termination
 # - Maintains audit trail
 #
-# === End Documentation ===
+# Implementation Note:
+#   The --monitor mode is an internal mechanism for post-detachment monitoring and cleanup.
+#   It is not intended for direct user invocation.
+#
 
-# --- Define Logging Function ---
 LOG_FILE="/workspace/frappe-bench/logs/worker.error.log"
 RQ_LOG_FILE="/workspace/frappe-bench/logs/worker.log"
 
 MONITORING_MODE=0
-DEBUG=0  # Set to 1 to enable debug logging
+DEBUG=0
 
-# Enable debug if BENCH_DEBUG is set
 if [[ -n "$BENCH_DEBUG" ]]; then
     DEBUG=1
 fi
@@ -119,7 +123,6 @@ log_message() {
 }
 
 is_under_supervisor() {
-    # Check various ways to detect supervisor
     if [[ -n "$SUPERVISOR_ENABLED" ]] || \
        [[ "$(ps -o comm= -p $PPID)" =~ supervisor ]] || \
        [[ -n "$SUPERVISOR_PROCESS_NAME" ]]; then
@@ -127,7 +130,6 @@ is_under_supervisor() {
     fi
     return 1
 }
-# --- End Logging Function ---
 
 setup_process_streams() {
     debug_log "Setting up process streams"
@@ -137,7 +139,6 @@ setup_process_streams() {
     debug_log "Process streams redirected to $RQ_LOG_FILE"
 }
 
-# Add new monitor-simple mode
 if [[ "$1" == "--monitor" ]]; then
     MONITORING_MODE=1
     BENCH_WORKER_PID="$2"
@@ -215,7 +216,6 @@ if [[ "$1" == "--monitor" ]]; then
     exit 0
 fi
 
-# Check if pstree is available, if not fall back to ps
 if ! command -v pstree >/dev/null 2>&1; then
     log_message "pstree not found, installing procps package"
     apt-get update -qq && apt-get install -qq procps >/dev/null 2>&1
@@ -224,7 +224,6 @@ if ! command -v pstree >/dev/null 2>&1; then
     fi
 fi
 
-# Function to show process tree
 show_process_tree() {
     local pid=$1
     if command -v pstree >/dev/null 2>&1; then
@@ -239,57 +238,52 @@ show_process_tree() {
 }
 
 restart_command() {
-      exec fm-helper restart "$@"
+      exec fmx restart "$@"
 }
 
 status_command() {
-      exec fm-helper status "$@"
+      exec fmx status "$@"
 }
 
 stop_command() {
-      exec fm-helper stop "$@"
+      exec fmx stop "$@"
 }
 
 show_fm_helper_commands() {
     echo -e "\nFrappe Manager Helper Commands (integrated with bench):"
-    echo "  status   - Show status of all services"
-    echo "  restart  - Restart all services"
-    echo "  stop     - Stop all services"
+    echo "restart Restart services with optional RQ worker coordination and migration"
+    echo "start  Start services or specific processes"
+    echo "status Show detailed status of services"
+    echo "stop   Stop services or specific processes"
     echo -e "\nThese commands can be executed in two ways:"
     echo "  1. Using bench: bench status/stop/restart"
-    echo "  2. Using fm-helper: fm-helper status/stop/restart"
+    echo "  2. Using fmx: fmx status/stop/restart"
     echo -e "\nFor more details on any command:"
     echo "  bench <command> --help"
-    echo "  fm-helper <command> --help"
+    echo "  fmx <command> --help"
     echo -e "\nNote: Both methods provide the same functionality. bench integration is provided for convenience.\n"
 }
 
 if [[ "$@" =~ ^restart[[:space:]]* ]]; then
-    # Remove 'restart' from arguments and pass the rest
     args="${@#restart}"
     restart_command $args
 
 elif [[ "$@" =~ ^status[[:space:]]* ]]; then
-    # Remove 'status' from arguments and pass the rest
     args="${@#status}"
     status_command $args
 
 elif [[ "$@" =~ ^stop[[:space:]]* ]]; then
-    # Remove 'stop' from arguments and pass the rest
     args="${@#stop}"
     stop_command $args
 
 elif [[ -z "$@" ]]; then
-    # Run bench without exec to allow show_fm_helper_commands afterwards
     log_message "Running bench without arguments followed by help message"
     /opt/user/.bin/bench_orig "$@"
     show_fm_helper_commands
     
-    # Ensure proper exit with the exit code from the bench_orig command
     exit $?
 
 elif [[ "$@" =~ ^worker[[:space:]]* ]]; then
-    # --- Signal Handling for 'bench worker' ---
 
     # Ensure BENCH_WORKER_PID is unset initially
     BENCH_WORKER_PID=""
@@ -364,7 +358,7 @@ elif [[ "$@" =~ ^worker[[:space:]]* ]]; then
         esac
     }
 
-    # --- Run the actual bench worker command ---
+    # Run the actual bench worker command
     # Ensure RQ worker has proper streams
     export PYTHONUNBUFFERED=1
     setup_process_streams
@@ -402,7 +396,7 @@ elif [[ "$@" =~ ^worker[[:space:]]* ]]; then
     BENCH_WRAPPER_PID=$(cat /tmp/bench_wrapper.pid 2>/dev/null)
     log_message "Bench wrapper PID: $BENCH_WRAPPER_PID, Worker group PID: $BENCH_WORKER_PID"
 
-    # --- Set Traps ---
+    # Set Traps
     log_message "Setting up signal traps..."
 
     # Define the signals we want to handle
@@ -431,13 +425,11 @@ elif [[ "$@" =~ ^worker[[:space:]]* ]]; then
         log_message "Wait interrupted by signal, continuing to wait..."
     done
 
-    # --- Cleanup ---
     trap - 34
     log_message "Cleaned up trap for signal 34."
     log_message "Wrapper exiting with status: $EXIT_STATUS"
     exit $EXIT_STATUS
 else
-    # Use exec for other bench commands to pass signals directly and replace the wrapper
     log_message "Executing '/opt/user/.bin/bench_orig $@'"
     exec /opt/user/.bin/bench_orig "$@"
 fi

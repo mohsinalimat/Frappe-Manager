@@ -485,7 +485,7 @@ def register_commands():
                         
 
 def main():
-    """Main entry point for the fm-helper CLI."""
+    """Main entry point for the fmx CLI."""
     setup_logging()
     get_service_names_for_completion()
     ServiceNameEnumFactory()

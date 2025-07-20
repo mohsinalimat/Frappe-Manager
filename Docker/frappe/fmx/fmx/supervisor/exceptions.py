@@ -1,5 +1,5 @@
 class SupervisorError(Exception):
-    """Base exception for fm-helper supervisor interactions."""
+    """Base exception for fmx supervisor interactions."""
     def __init__(self, message, service_name=None, process_name=None, original_exception=None):
         self.service_name = service_name
         self.process_name = process_name
