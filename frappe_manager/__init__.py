@@ -75,7 +75,6 @@ DEFAULT_EXTENSIONS = [
     "MS-vsliveshare.vsliveshare",
     "visualstudioexptteam.vscodeintellicode",
     "christian-kohler.path-intellisense",
-    "streetsidesoftware.code-spell-checker",
 ]
 
 
