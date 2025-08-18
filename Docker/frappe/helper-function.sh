@@ -256,9 +256,12 @@ emer() {
 configure_workspace()
 {
     start_time=$(date +%s.%N)
+
     chown -R "$USERID":"$USERGROUP" /opt
+
     end_time=$(date +%s.%N)
     execution_time=$(awk "BEGIN {print $end_time - $start_time}")
+
     echo "Time taken for chown /opt : $execution_time seconds"
 
     if [[ ! -d "/workspace/.oh-my-zsh" ]]; then
@@ -269,6 +272,18 @@ configure_workspace()
     if [[ ! -f "/workspace/.zshrc" ]]; then
         cp -p /opt/user/.zshrc  /workspace/
     fi
+
+    if [[ ! -f "/workspace/.nvm" ]]; then
+        cp -p /opt/.nvm /workspace/
+    fi
+
+    export NVM_DIR=/workspace/.nvm
+
+    if [[ ! -f "/workspace/.pyenv" ]]; then
+        cp -p /opt/.pyenv /workspace/
+    fi
+
+    export PYENV_ROOT=/workspace/.pyenv
 
     if [[ ! -f "/workspace/.profile" ]]; then
         cp -p /opt/user/.profile  /workspace/
