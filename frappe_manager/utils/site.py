@@ -173,22 +173,24 @@ def get_bench_db_connection_info(bench_name: str, bench_path: Path):
     site_config_file = bench_path / "workspace" / "frappe-bench" / "sites" / bench_name / "site_config.json"
     common_site_config_file = bench_path / "workspace" / "frappe-bench" / "sites" / 'common_site_config.json'
 
+    db_info["name"] = str(bench_name).replace(".", "-")
+    db_info["user"] = str(bench_name).replace(".", "-")
+    db_info["password"] = None
+
     if common_site_config_file.exists():
         with open(common_site_config_file, "r") as f:
             common_site_config = json.load(f)
-            db_info["host"] = common_site_config.get("db_host")
-            db_info["port"] = common_site_config.get("db_port")
+            if common_site_config:
+                db_info["host"] = common_site_config.get("db_host")
+                db_info["port"] = common_site_config.get("db_port")
 
     if site_config_file.exists():
         with open(site_config_file, "r") as f:
             site_config = json.load(f)
-            db_info["name"] = site_config["db_name"]
-            db_info["user"] = site_config["db_name"]
-            db_info["password"] = site_config["db_password"]
-    else:
-        db_info["name"] = str(bench_name).replace(".", "-")
-        db_info["user"] = str(bench_name).replace(".", "-")
-        db_info["password"] = None
+            if site_config:
+                db_info["name"] = site_config["db_name"]
+                db_info["user"] = site_config["db_name"]
+                db_info["password"] = site_config["db_password"]
 
     return db_info
 
