@@ -13,6 +13,9 @@ emer() {
 
 BENCH_COMMAND='/opt/user/.bin/bench_orig'
 
+pyenv_activate_default
+nvm_activate_default
+
 configure_common_site_config(){
     $BENCH_COMMAND config dns_multitenant on
     update_common_site_config webserver_port "$WEB_PORT"

@@ -3,9 +3,23 @@ FROM ubuntu:22.04 AS bench
 LABEL author=rtCamp
 LABEL org.opencontainers.image.source=https://github.com/rtcamp/Frappe-Manager
 
-ARG PYTHON_VERSION=3.12.0
+ARG PYTHON_VERSIONS='3.12.0'
+ARG PYENV_GIT_VERSION='2.6.7'
+ARG PYENV_ROOT='/workspace/.pyenv'
+ARG NVM_VERSION='0.39.0'
+ARG NVM_DIR='/workspace/.nvm'
+ARG NODE_VERSIONS='22.18.0'
 ARG PREBAKE_APPS='erpnext:version-15,hrms:version-15'
 ARG PREBAKE_FRAPPE_BRANCH='version-15'
+SHELL ["/bin/bash", "-c"]
+
+ENV PYTHON_VERSIONS=${PYTHON_VERSIONS}
+ENV PYENV_GIT_VERSION=$PYENV_GIT_VERSION
+ENV NVM_VERSION=${NVM_VERSION}
+ENV NODE_VERSIONS=${NODE_VERSIONS}
+ENV PYENV_ROOT=${PYENV_ROOT}
+ENV NVM_DIR=${NVM_DIR}
+ENV BENCH_USE_UV=true
 
 RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install --no-install-recommends -y \
     # For frappe framework
@@ -88,18 +102,20 @@ RUN export NAME='frappe' && \
 
 RUN echo PREBAKE_APPS="$PREBAKE_APPS" >> /prebake_info && echo PREBAKE_FRAPPE_BRANCH="$PREBAKE_FRAPPE_BRANCH" >> /prebake_info
 
-ENV PYENV_ROOT=/opt/.pyenv
-ENV PATH=$PYENV_ROOT/shims:$PYENV_ROOT/bin:$PATH
+# ENV PATH=$PYENV_ROOT/shims:$PYENV_ROOT/bin:$PATH
 
 # for bench wrapper
 ENV PATH=/opt/user/.bin:${PATH}
 
 # for nvm
-ENV NODE_VERSION=20.9.0
-ENV NVM_DIR=/opt/.nvm
-ENV PATH=${NVM_DIR}/versions/node/v${NODE_VERSION}/bin/:${PATH}
+# ENV PATH=${NVM_DIR}/versions/node/v${NODE_VERSION}/bin/:${PATH}
+
+COPY --chmod=0755 ./helper-function.sh /scripts/
 
 FROM bench AS prebake
+
+ENV PATH=$PYENV_ROOT/shims:$PYENV_ROOT/bin:$PATH
+ENV PATH="${NVM_DIR}/versions/node/${NODE_VERSIONS%% *}/bin/:${PATH}"
 
 RUN chown -R frappe:frappe /opt
 
@@ -110,7 +126,7 @@ ENV USERPROFILE=/opt/user/.profile
 
 WORKDIR /opt
 
-RUN mkdir -p /opt/user && touch /opt/user/.profile && ls -lah
+RUN mkdir -p /opt/user/conf.d && touch /opt/user/.profile && ls -lah
 
 ENV ZSH=/opt/user/.oh-my-zsh
 ENV DISABLE_UPDATE_PROMPT=true
@@ -121,43 +137,29 @@ RUN unset ZSH
 
 COPY --chown=frappe:frappe ./zshrc /opt/user/.zshrc
 COPY --chown=frappe:frappe ./fm.zsh-theme /opt/user/fm.zsh-theme
-
-RUN git clone --depth 1 https://github.com/pyenv/pyenv.git .pyenv \
-    && pyenv install $PYTHON_VERSION 3.11.0 \
-    && PYENV_VERSION=$PYTHON_VERSION pip install --no-cache-dir virtualenv \
-    && pyenv global $PYTHON_VERSION \
-    && echo 'export PYENV_ROOT="/opt/.pyenv"' >> "$USERZSHRC" \
-    && echo 'command -v pyenv >/dev/null || export PATH="$PYENV_ROOT/bin:$PATH"' >> "$USERZSHRC" \
-    && echo 'eval "$(pyenv init --path)"' >>"$USERZSHRC" \
-    && find /opt/.pyenv/versions -depth \( \( -type d -a \( -name test -o -name tests -o -name idle_test \) \) -o \( -type f -a \( -name '*.pyc' -o -name '*.pyo' -o -name 'libpython*.a' \) \) \) -exec rm -rf '{}' + ;
-
-
 COPY --chown=frappe:frappe ./fmx /opt/user/fmx
 
-RUN mkdir -p /opt/user/.bin /opt/user/conf.d \
-    && python -m venv /opt/user/bench-venv \
-    && /opt/user/bench-venv/bin/pip install frappe-bench /opt/user/fmx \
+RUN mkdir -p /workspace
+
+USER root
+RUN . /scripts/helper-function.sh && setup_pyenv_and_virtualenv ${PYENV_GIT_VERSION}
+USER frappe
+
+# RUN . /scripts/helper-function.sh && pyenv_activate_default \
+
+RUN mkdir -p /opt/user/.bin \
+    && python3 -m venv /opt/user/bench-venv \
+    && /opt/user/bench-venv/bin/pip install frappe-bench uv /opt/user/fmx \
     && rm -rf /opt/user/fmx \
     && chown -R frappe:frappe /opt/user/bench-venv \
     && ln -s /opt/user/bench-venv/bin/bench /opt/user/.bin/bench_orig \
-    && ln -s /opt/user/bench-venv/bin/fmx /opt/user/.bin/fmx
+    && ln -s /opt/user/bench-venv/bin/fmx /opt/user/.bin/fmx \
+    && ln -s /opt/user/bench-venv/bin/uv /opt/user/.bin/uv
 
+USER root
+RUN . /scripts/helper-function.sh && setup_nvm_and_yarn "$NVM_VERSION"
+USER frappe
 
-RUN mkdir -p /opt/.nvm \
-    && wget -qO- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.0/install.sh | bash \
-    && . ${NVM_DIR}/nvm.sh \
-    # support previous version
-    && nvm install 18.17.0 \
-    && nvm install ${NODE_VERSION} \
-    && nvm use v${NODE_VERSION} \
-    && npm install -g yarn \
-    && nvm alias default v${NODE_VERSION} \
-    && rm -rf ${NVM_DIR}/.cache \
-    && echo 'export NVM_DIR="/opt/.nvm"' >>"$USERZSHRC" \
-    && echo '[ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"  # This loads nvm' >> "$USERZSHRC" \
-    && echo '[ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"  # This loads nvm bash_completion' >> "$USERZSHRC"
-
-RUN mkdir -p /workspace
 
 WORKDIR /workspace
 
@@ -170,7 +172,6 @@ COPY --chown=frappe:frappe --chmod=0755 ./bench-dev-server /opt/user/
 COPY --chown=frappe:frappe --chmod=0755 ./bench-wrapper.sh /opt/user/.bin/bench
 
 COPY --chmod=0755 ./prebake.sh /scripts/
-COPY --chmod=0755 ./helper-function.sh /scripts/
 
 RUN ls -lah /workspace && /scripts/prebake.sh && mv /workspace/frappe-bench/apps/* /workspace/
 
@@ -182,6 +183,9 @@ COPY --from=prebake --chown=frappe:frappe /workspace/frappe-bench /workspace/fra
 COPY --from=prebake --chown=frappe:frappe /workspace/frappe /workspace/frappe-bench/apps/frappe
 COPY --from=prebake --chown=frappe:frappe /workspace/erpnext /workspace/frappe-bench/apps/erpnext
 COPY --from=prebake --chown=frappe:frappe /workspace/hrms /workspace/frappe-bench/apps/hrms
+
+COPY --from=prebake --chown=frappe:frappe /workspace/.pyenv /workspace/.pyenv
+COPY --from=prebake --chown=frappe:frappe /workspace/.nvm /workspace/.nvm
 
 FROM bench AS fm_image
 
@@ -200,12 +204,14 @@ COPY --chmod=0755 ./user-script.sh /scripts/
 COPY --chmod=0755 ./launch_supervisor_service.sh /scripts/
 COPY --chmod=0755 ./helper-function.sh /scripts/
 
-RUN rm -rf /opt && mkdir -p /workspace /opt
+RUN rm -rf /opt && mkdir -p /workspace /opt && rm -rf /etc/bash.bashrc /etc/zsh/zshrc
 
 WORKDIR /workspace
 
-COPY --from=prebake --chown=frappe:frappe /opt/.pyenv /opt/.pyenv
-COPY --from=prebake --chown=frappe:frappe /opt/.nvm /opt/.nvm
+# COPY --from=prebake --chown=frappe:frappe /opt/.pyenv /workspace/.pyenv
+# COPY --from=prebake --chown=frappe:frappe /opt/.nvm /opt/.nvm
 COPY --from=prebake --chown=frappe:frappe /opt/user /opt/user
+COPY --from=prebake /etc/bash.bashrc /etc/bash.bashrc
+COPY --from=prebake /etc/zsh/zshrc /etc/zsh/zshrc
 
 ENTRYPOINT ["/bin/bash","/entrypoint.sh"]
