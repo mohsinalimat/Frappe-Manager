@@ -74,6 +74,14 @@ jobs:
           echo "prebake_image_name=ghcr.io/${owner}/frappe-manager-prebake:$(basename ${{ matrix.platform }})-${tag}" >> $GITHUB_ENV
           echo "fm_image_name=ghcr.io/${owner}/frappe-manager-${{ matrix.service_name }}:$(basename ${{ matrix.platform }})-${tag}" >> $GITHUB_ENV
 
+      - name: Set up buildx cache
+        uses: actions/cache@v3
+        with:
+          path: /tmp/.buildx-cache
+          key: ${{ runner.os }}-buildx-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-buildx-
+
       - name: Build and push Docker image (non-frappe)
         if: matrix.service_name != 'frappe'
         uses: docker/build-push-action@v4
@@ -83,6 +91,8 @@ jobs:
           platforms: ${{ matrix.platform }}
           tags: ${{ env.image_name }}
           provenance: false
+          cache-from: type=local,src=/tmp/.buildx-cache
+          cache-to: type=local,dest=/tmp/.buildx-cache
 
       - name: Build and push prebake image
         if: matrix.service_name == 'frappe'
@@ -94,6 +104,8 @@ jobs:
           tags: ${{ env.prebake_image_name }}
           target: prebake_image
           provenance: false
+          cache-from: type=local,src=/tmp/.buildx-cache
+          cache-to: type=local,dest=/tmp/.buildx-cache
 
       - name: Build and push fm image
         if: matrix.service_name == 'frappe'
@@ -105,6 +117,13 @@ jobs:
           tags: ${{ env.fm_image_name }}
           target: fm_image
           provenance: false
+          cache-from: type=local,src=/tmp/.buildx-cache
+          cache-to: type=local,dest=/tmp/.buildx-cache
+
+      - name: Prune buildx cache (self-hosted only)
+        if: startsWith(matrix.os, 'self-hosted')
+        run: |
+          docker buildx prune -af
 
   combine:
     name: Combine both platform images
