@@ -274,13 +274,13 @@ configure_workspace()
     fi
 
     if [[ ! -f "/workspace/.nvm" ]]; then
-        cp -p /opt/.nvm /workspace/
+        cp -r /opt/.nvm /workspace/
     fi
 
     export NVM_DIR=/workspace/.nvm
 
     if [[ ! -f "/workspace/.pyenv" ]]; then
-        cp -p /opt/.pyenv /workspace/
+        cp -r /opt/.pyenv /workspace/
     fi
 
     export PYENV_ROOT=/workspace/.pyenv
