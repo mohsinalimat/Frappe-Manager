@@ -106,7 +106,7 @@ jobs:
           tags: ${{ env.image_name }}
           provenance: false
           cache-from: ${{ env.USE_CACHE == 'true' && format('type=registry,ref=ghcr.io/{0}/frappe-manager-{1}:buildcache', env.owned, matrix.service_name) || '' }}
-          cache-to: ${{ env.USE_CACHE == 'true' && format('type=registry,ref=ghcr.io/{0}/frappe-manager-{1}:buildcache,mode=max', env.owned, matrix.service_name) || '' }}
+          cache-to: ${{ format('type=registry,ref=ghcr.io/{0}/frappe-manager-{1}:buildcache,mode=max', env.owned, matrix.service_name) || '' }}
 
       - name: Build and push prebake image
         if: matrix.service_name == 'frappe'
@@ -119,7 +119,7 @@ jobs:
           target: prebake_image
           provenance: false
           cache-from: ${{ env.USE_CACHE == 'true' && format('type=registry,ref=ghcr.io/{0}/frappe-manager-prebake:buildcache', env.owned) || '' }}
-          cache-to: ${{ env.USE_CACHE == 'true' && format('type=registry,ref=ghcr.io/{0}/frappe-manager-prebake:buildcache,mode=max', env.owned) || '' }}
+          cache-to: ${{ format('type=registry,ref=ghcr.io/{0}/frappe-manager-prebake:buildcache,mode=max', env.owned) || '' }}
 
       - name: Build and push fm image
         if: matrix.service_name == 'frappe'
@@ -132,7 +132,7 @@ jobs:
           target: fm_image
           provenance: false
           cache-from: ${{ env.USE_CACHE == 'true' && format('type=registry,ref=ghcr.io/{0}/frappe-manager-frappe:buildcache', env.owned) || '' }}
-          cache-to: ${{ env.USE_CACHE == 'true' && format('type=registry,ref=ghcr.io/{0}/frappe-manager-frappe:buildcache,mode=max', env.owned) || '' }}
+          cache-to: ${{ format('type=registry,ref=ghcr.io/{0}/frappe-manager-frappe:buildcache,mode=max', env.owned) || '' }}
 
       - name: Prune buildx cache (self-hosted only)
         if: startsWith(matrix.os, 'self-hosted')
