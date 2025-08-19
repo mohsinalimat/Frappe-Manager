@@ -318,12 +318,15 @@ function setup_pyenv_and_virtualenv() {
 
     git clone --depth 1 --branch "v$version" https://github.com/pyenv/pyenv.git "$PYENV_ROOT"
 
+    pyenv_activate
+
     for version in ${PYTHON_VERSIONS}; do
         pyenv install "$version"
     done
 
     PYTHON_VERSION="${PYTHON_VERSIONS%% *}"
     PYTHON_VERSION="$PYTHON_VERSION" pip install --no-cache-dir virtualenv
+
     pyenv global "$PYTHON_VERSION"
 
     if [[ "$2" != "false" ]]; then
