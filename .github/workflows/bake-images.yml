@@ -76,7 +76,7 @@ jobs:
 
       - name: Set owner
         run: |
-          echo "ownned=$( echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]' )" >> $GITHUB_ENV
+          echo "owned=$( echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]' )" >> $GITHUB_ENV
 
       - name: Build and push Docker image (non-frappe)
         if: matrix.service_name != 'frappe'
