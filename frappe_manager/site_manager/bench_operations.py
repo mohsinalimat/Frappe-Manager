@@ -117,6 +117,8 @@ class BenchOperations:
         service: str = 'frappe',
         compose_project_obj: Optional[ComposeProject] = None,
     ):
+        command = f"/bin/bash -c \'source /etc/bash.bashrc; {command}\'"
+
         if compose_project_obj:
             compose_project: ComposeProject = compose_project_obj
         else:
@@ -236,16 +238,18 @@ class BenchOperations:
         bench_dev_server_script_output = self.container_run("cat /opt/user/bench-dev-server", capture_output=True)
         import re
 
+        # Join with newline to preserve formatting
+        bench_dev_server_script = "\n".join(bench_dev_server_script_output.combined)
+
         if "host" in " ".join(bench_serve_help_output.combined):
             new_bench_dev_server_script = re.sub(
-                r"--port \d+", "--host 0.0.0.0 --port 80", " ".join(bench_dev_server_script_output.combined)
+                r"--port \d+", "--host 0.0.0.0 --port 80", bench_dev_server_script
             )
         else:
             new_bench_dev_server_script = re.sub(
-                r"--port \d+", "--port 80", " ".join(bench_dev_server_script_output.combined)
+                r"--port \d+", "--port 80", bench_dev_server_script
             )
-
-        self.container_run(f'echo "{new_bench_dev_server_script}" > /opt/user/bench-dev-server.sh')
+        self.container_run(f"echo '{new_bench_dev_server_script}' > /opt/user/bench-dev-server.sh")
         self.container_run("chmod +x /opt/user/bench-dev-server.sh", user='root')
 
     def bench_install_apps(self, apps_lists, already_installed_apps: Dict = STABLE_APP_BRANCH_MAPPING_LIST):
