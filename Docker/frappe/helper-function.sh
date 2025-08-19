@@ -320,14 +320,24 @@ function setup_pyenv_and_virtualenv() {
 
     pyenv_activate
 
+    venv_cfg="/workspace/frappe-branch/env/pyvenv.cfg"
+
+    if [[ -f "$venv_cfg" ]]; then
+        venv_version=$(grep "version_info" "$venv_cfg" | cut -d "=" -f 2 | tr -d ' ')
+        if [[ -n "$venv_version" ]]; then
+            echo "Found Python version in /workspace/frappe-branch/env/pyvenv.cfg: $venv_version"
+            pyenv install "$venv_version" || echo "Failed to install $venv_version via pyenv"
+        fi
+    fi
+
     for version in ${PYTHON_VERSIONS}; do
         pyenv install "$version"
     done
 
     PYTHON_VERSION="${PYTHON_VERSIONS%% *}"
-    PYTHON_VERSION="$PYTHON_VERSION" pip install --no-cache-dir virtualenv
-
     pyenv global "$PYTHON_VERSION"
+
+    pip install --no-cache-dir virtualenv
 
     if [[ "$2" != "false" ]]; then
         sed -i '1i if [[ -d "$PYENV_ROOT" ]]; then export PYENV_ROOT="$PYENV_ROOT"; export PATH="$PYENV_ROOT/bin:$PATH"; eval "$(pyenv init --path)"; fi' /etc/bash.bashrc
@@ -341,6 +351,14 @@ function setup_pyenv_and_virtualenv() {
 function configure_workspace()
 {
     start_time=$(date +%s.%N)
+
+    if [[ ! -f "/workspace/.nvm" ]]; then
+        setup_nvm_and_yarn ${NVM_VERSION} false
+    fi
+
+    if [[ ! -f "/workspace/.pyenv" ]]; then
+        setup_pyenv_and_virtualenv ${PYENV_GIT_VERSION} false
+    fi
 
     chown -R "$USERID":"$USERGROUP" /opt
 
@@ -356,14 +374,6 @@ function configure_workspace()
 
     if [[ ! -f "/workspace/.zshrc" ]]; then
         cp -p /opt/user/.zshrc  /workspace/
-    fi
-
-    if [[ ! -f "/workspace/.nvm" ]]; then
-        setup_nvm_and_yarn ${NVM_VERSION} false
-    fi
-
-    if [[ ! -f "/workspace/.pyenv" ]]; then
-        setup_pyenv_and_virtualenv ${PYENV_GIT_VERSION} false
     fi
 
     if [[ ! -f "/workspace/.profile" ]]; then
