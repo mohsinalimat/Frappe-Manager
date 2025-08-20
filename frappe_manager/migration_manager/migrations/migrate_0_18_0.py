@@ -37,23 +37,6 @@ class MigrationV0180(MigrationBase):
     def migrate_bench(self, bench: MigrationBench):
         bench.compose_project.down_service(volumes=True)
 
-        richprint.change_head("Migrating nginx config")
-
-        nginx_default_conf = bench.path / "configs/nginx/conf/conf.d/default.conf"
-
-        if nginx_default_conf.exists():
-            nginx_default_conf.unlink()
-
-        output = bench.compose_project.docker.compose.run(
-            service="nginx",
-            command="-c 'jinja2 -D SITENAME=$SITENAME /config/template.conf > /etc/nginx/conf.d/default.conf'",
-            rm=True,
-            entrypoint="/bin/bash",
-            stream=True,
-        )
-
-        richprint.change_head("Migrating bench compose")
-
         images_info = bench.compose_project.compose_file_manager.get_all_images()
 
         richprint.live_lines(output, padding=(0, 0, 0, 2))
@@ -109,6 +92,7 @@ class MigrationV0180(MigrationBase):
         self.migrate_pyenv_and_nvm(bench)
 
     def migrate_pyenv_and_nvm(self, bench: MigrationBench):
+
         richprint.change_head("Migrating nginx config")
 
         nginx_default_conf = bench.path / "configs/nginx/conf/conf.d/default.conf"
