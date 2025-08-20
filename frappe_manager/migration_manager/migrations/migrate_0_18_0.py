@@ -109,6 +109,23 @@ class MigrationV0180(MigrationBase):
         self.migrate_pyenv_and_nvm(bench)
 
     def migrate_pyenv_and_nvm(self, bench: MigrationBench):
+        richprint.change_head("Migrating nginx config")
+
+        nginx_default_conf = bench.path / "configs/nginx/conf/conf.d/default.conf"
+
+        if nginx_default_conf.exists():
+            nginx_default_conf.unlink()
+
+        output = bench.compose_project.docker.compose.run(
+            service="nginx",
+            command="-c 'jinja2 -D SITENAME=$SITENAME /config/template.conf > /etc/nginx/conf.d/default.conf'",
+            rm=True,
+            entrypoint="/bin/bash",
+            stream=True,
+        )
+
+        richprint.change_head("Migrating bench compose")
+
         frappe_prebake_image = f'ghcr.io/rtcamp/frappe-manager-prebake:{self.version.version_string()}'
         frappe_image = f'ghcr.io/rtcamp/frappe-manager-frappe:{self.version.version_string()}'
 
