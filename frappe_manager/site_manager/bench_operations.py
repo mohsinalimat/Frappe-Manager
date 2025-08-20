@@ -208,14 +208,14 @@ class BenchOperations:
                     if "frappe-web" in section_name:
                         if key == "command":
                             value = value.replace("127.0.0.1:80", "0.0.0.0:80")
-                            
-                            workers = (os.cpu_count() * 2) + 1
-                            
+                            cpu_count = os.cpu_count() or 2
+                            workers = (cpu_count * 2) + 1
                             value = re.sub(r'-w\s+\d+', f'-w {workers}', value)
                             
                     section_config.set(section_name, key, value)
 
                 section_name_delimeter = '-frappe-'
+
                 if '-node-' in section_name:
                     section_name_delimeter = '-node-'
 
@@ -225,7 +225,6 @@ class BenchOperations:
                     file_name = file_name_prefix + ".workers.fm.supervisor.conf"
 
                 new_file: Path = supervisor_conf_path.parent / file_name
-
                 with open(new_file, "w") as section_file:
                     section_config.write(section_file)
 
