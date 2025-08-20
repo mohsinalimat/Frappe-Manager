@@ -151,7 +151,7 @@ class MigrationBase(ABC):
         self,
         bench: MigrationBench,
         db_info: DatabaseServerServiceInfo,
-        compose_project: ComposeProject,
+        compose_project,
         backup_manager: BackupManager,
     ):
         richprint.change_head(f'Commencing db {bench.name} backup')
