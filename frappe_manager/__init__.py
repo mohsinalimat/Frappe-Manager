@@ -78,7 +78,6 @@ class SiteServicesEnum(str, Enum):
     mariadb = "mariadb"
     redis_queue = "redis-queue"
     redis_cache = "redis-cache"
-    redis_socketio = "redis-socketio"
     schedule = "schedule"
     socketio = "socketio"
 

@@ -96,7 +96,6 @@ class BenchOperations:
             self.bench.services.database_manager.database_server_info.host: self.bench.services.database_manager.database_server_info.port,
             f"{self.bench.bench_config.container_name_prefix}{CLI_DEFAULT_DELIMETER}redis-cache": 6379,
             f"{self.bench.bench_config.container_name_prefix}{CLI_DEFAULT_DELIMETER}redis-queue": 6379,
-            f"{self.bench.bench_config.container_name_prefix}{CLI_DEFAULT_DELIMETER}redis-socketio": 6379,
         }
         for service, port in required_services.items():
             output: SubprocessOutput = self.wait_for_required_service(host=service, port=port)

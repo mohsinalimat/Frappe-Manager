@@ -180,7 +180,6 @@ class MariaDBManager(DatabaseServiceManager):
                 return output
             richprint.live_lines(output)
         except DockerException as e:
-            print(e)
             if raise_exception_obj:
                 raise raise_exception_obj
             raise e

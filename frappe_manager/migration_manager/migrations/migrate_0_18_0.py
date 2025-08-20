@@ -39,8 +39,10 @@ class MigrationV0180(MigrationBase):
 
         richprint.change_head("Migrating bench compose")
 
-
         images_info = bench.compose_project.compose_file_manager.get_all_images()
+
+        nginx_default_conf = bench.path / "configs/nginx/conf/conf.d/default.conf"
+        nginx_default_conf.unlink()
 
         # images
         frappe_image_info = images_info["frappe"]
@@ -49,6 +51,17 @@ class MigrationV0180(MigrationBase):
         nginx_image_info = images_info["nginx"]
         nginx_image_info["tag"] = self.version.version_string()
 
+        redis_cache_image_info = images_info["redis-cache"]
+        redis_cache_image_info["tag"] = "8-alpine"
+
+        redis_queue_image_info = images_info["redis-queue"]
+        redis_queue_image_info["tag"] = "8-alpine"
+
+        if bench.compose_project.compose_file_manager.yml.get('services',{}).get('redis-socketio', None):
+            del bench.compose_project.compose_file_manager.yml['services']['redis-socketio']
+        if bench.compose_project.compose_file_manager.yml.get('volumes',{}).get('redis-socketio-data', None):
+            del bench.compose_project.compose_file_manager.yml['volumes']['redis-socketio-data']
+
         # change image nginx
         images_info["nginx"] = nginx_image_info
 
@@ -56,10 +69,13 @@ class MigrationV0180(MigrationBase):
         images_info["frappe"] = frappe_image_info
         images_info["socketio"] = frappe_image_info
         images_info["schedule"] = frappe_image_info
+        images_info["redis-cache"] = redis_cache_image_info
+        images_info["redis-queue"] = redis_queue_image_info
 
         for image in [
             frappe_image_info,
             nginx_image_info,
+            redis_cache_image_info,
             {'name': f'ghcr.io/rtcamp/frappe-manager-prebake', 'tag': self.version.version_string()},
         ]:
             pull_image = f"{image['name']}:{image['tag']}"
@@ -73,6 +89,7 @@ class MigrationV0180(MigrationBase):
         bench.compose_project.compose_file_manager.set_all_images(images_info)
         bench.compose_project.compose_file_manager.set_version(str(self.version))
         bench.compose_project.compose_file_manager.write_to_file()
+
         self.migrate_workers_compose(bench)
         self.migrate_pyenv_and_nvm(bench)
 

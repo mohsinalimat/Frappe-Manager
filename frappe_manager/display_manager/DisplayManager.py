@@ -89,7 +89,7 @@ class DisplayManager:
 
         raise typer.Exit(1)
 
-    def print(self, text: str, emoji_code: str = ":white_check_mark:", prefix: Optional[str] = None, **kwargs):
+    def print(self, text: str, emoji_code: str = ":zap:", prefix: Optional[str] = None, **kwargs):
         """
         Prints the given text with an optional emoji code.
 
