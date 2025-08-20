@@ -37,14 +37,26 @@ class MigrationV0180(MigrationBase):
     def migrate_bench(self, bench: MigrationBench):
         bench.compose_project.down_service(volumes=True)
 
-        richprint.change_head("Migrating bench compose")
-
-        images_info = bench.compose_project.compose_file_manager.get_all_images()
-
         nginx_default_conf = bench.path / "configs/nginx/conf/conf.d/default.conf"
 
         if nginx_default_conf.exists():
             nginx_default_conf.unlink()
+
+        richprint.change_head("Migrating bench compose")
+        output = bench.compose_project.docker.compose.run(
+            service="nginx",
+            command="/entrypoint.sh",
+            rm=True,
+            entrypoint="/bin/bash",
+            stream=True,
+        )
+
+        richprint.change_head("Migrating bench compose")
+
+        images_info = bench.compose_project.compose_file_manager.get_all_images()
+
+        richprint.live_lines(output, padding=(0, 0, 0, 2))
+        richprint.print(f"Migrated nginx config")
 
         # images
         frappe_image_info = images_info["frappe"]
