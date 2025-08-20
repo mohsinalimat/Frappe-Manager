@@ -37,15 +37,16 @@ class MigrationV0180(MigrationBase):
     def migrate_bench(self, bench: MigrationBench):
         bench.compose_project.down_service(volumes=True)
 
+        richprint.change_head("Migrating nginx config")
+
         nginx_default_conf = bench.path / "configs/nginx/conf/conf.d/default.conf"
 
         if nginx_default_conf.exists():
             nginx_default_conf.unlink()
 
-        richprint.change_head("Migrating bench compose")
         output = bench.compose_project.docker.compose.run(
             service="nginx",
-            command="/entrypoint.sh",
+            command="-c 'jinja2 -D SITENAME=$SITENAME /config/template.conf > /etc/nginx/conf.d/default.conf'",
             rm=True,
             entrypoint="/bin/bash",
             stream=True,
