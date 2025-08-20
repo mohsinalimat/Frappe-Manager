@@ -33,6 +33,12 @@ class DatabaseServiceException(Exception):
         self.message: str = f'Service {service_name} db server : {message}'
         super().__init__(self.message)
 
+class DatabaseServiceQueryAccessDenied(Exception):
+    def __init__(self, query: str, message='Acess denied for query {}') -> None:
+        self.query = query
+        self.message = message.format(query)
+        super().__init__(self.message)
+
 
 class DatabaseServicePasswordNotFound(DatabaseServiceException):
     def __init__(self, service_name: str, message='Failed to determine root password.') -> None:
