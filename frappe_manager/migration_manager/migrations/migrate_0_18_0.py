@@ -42,7 +42,9 @@ class MigrationV0180(MigrationBase):
         images_info = bench.compose_project.compose_file_manager.get_all_images()
 
         nginx_default_conf = bench.path / "configs/nginx/conf/conf.d/default.conf"
-        nginx_default_conf.unlink()
+
+        if nginx_default_conf.exists():
+            nginx_default_conf.unlink()
 
         # images
         frappe_image_info = images_info["frappe"]
@@ -169,7 +171,7 @@ class MigrationV0180(MigrationBase):
             richprint.live_lines(output, padding=(0, 0, 0, 2))
             output = bench.compose_project.docker.compose.run(
                 service="frappe",
-                command=f"-c 'source /etc/bash.bashrc; set -x; cd /workspace/frappe-bench; mv env env.bak; uv venv env --seed --link-mode=copy; for app in $(ls -1 apps); do uv pip install --python /workspace/frappe-bench/env/bin/python -U -e apps/$app; done'",
+                command=f"-c 'source /etc/bash.bashrc; set -x; cd /workspace/frappe-bench; mv env env.bak; uv venv env --seed --link-mode=copy; for app in $(ls -1 apps); do uv pip install --python /workspace/frappe-bench/env/bin/python -U -e apps/$app || continue; done'",
                 rm=True,
                 entrypoint="/bin/bash",
                 stream=True,
