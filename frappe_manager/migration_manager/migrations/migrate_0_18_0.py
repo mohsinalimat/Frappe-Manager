@@ -37,10 +37,8 @@ class MigrationV0180(MigrationBase):
     def migrate_bench(self, bench: MigrationBench):
         bench.compose_project.down_service(volumes=True)
 
+        richprint.change_head("Migrating bench compose")
         images_info = bench.compose_project.compose_file_manager.get_all_images()
-
-        richprint.live_lines(output, padding=(0, 0, 0, 2))
-        richprint.print(f"Migrated nginx config")
 
         # images
         frappe_image_info = images_info["frappe"]
@@ -107,8 +105,9 @@ class MigrationV0180(MigrationBase):
             entrypoint="/bin/bash",
             stream=True,
         )
+        richprint.live_lines(output, padding=(0, 0, 0, 2))
+        richprint.print(f"Migrated nginx config")
 
-        richprint.change_head("Migrating bench compose")
 
         frappe_prebake_image = f'ghcr.io/rtcamp/frappe-manager-prebake:{self.version.version_string()}'
         frappe_image = f'ghcr.io/rtcamp/frappe-manager-frappe:{self.version.version_string()}'
