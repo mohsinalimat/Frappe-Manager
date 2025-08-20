@@ -1,11 +1,7 @@
 import os
 import re
-import json
 from pathlib import Path
 
-from frappe_manager.compose_manager import DockerVolumeMount, DockerVolumeType
-from frappe_manager.compose_manager.ComposeFile import ComposeFile
-from frappe_manager.compose_project.compose_project import ComposeProject
 from frappe_manager.display_manager.DisplayManager import richprint
 from frappe_manager.docker_wrapper.DockerClient import DockerClient
 from frappe_manager.migration_manager.backup_manager import BackupManager
@@ -19,20 +15,11 @@ from frappe_manager.migration_manager.migration_helpers import (
     MigrationServicesManager,
 )
 from frappe_manager.migration_manager.version import Version
+from frappe_manager.utils.docker import host_run_cp
 
 
 def get_container_name_prefix(site_name):
     return 'fm' + "__" + site_name.replace(".", "_")
-
-
-def get_new_envrionment_for_service(service_name: str):
-    envs = {
-        "USERID": os.getuid(),
-        "USERGROUP": os.getgid(),
-        "SUPERVISOR_SERVICE_CONFIG_FILE_NAME": f"{service_name}.fm.supervisor.conf",
-    }
-    return envs
-
 
 class MigrationV0180(MigrationBase):
     version = Version("0.18.0")
@@ -49,11 +36,9 @@ class MigrationV0180(MigrationBase):
 
     def migrate_bench(self, bench: MigrationBench):
         bench.compose_project.down_service(volumes=True)
+
         richprint.change_head("Migrating bench compose")
 
-        if not bench.compose_project.compose_file_manager.exists():
-            richprint.error(f"Failed to migrate {bench.name} compose file.")
-            raise MigrationExceptionInBench(f"{bench.compose_project.compose_file_manager.compose_path} not found.")
 
         images_info = bench.compose_project.compose_file_manager.get_all_images()
 
@@ -89,6 +74,91 @@ class MigrationV0180(MigrationBase):
         bench.compose_project.compose_file_manager.set_version(str(self.version))
         bench.compose_project.compose_file_manager.write_to_file()
         self.migrate_workers_compose(bench)
+        self.migrate_pyenv_and_nvm(bench)
+
+    def migrate_pyenv_and_nvm(self, bench: MigrationBench):
+        frappe_prebake_image = f'ghcr.io/rtcamp/frappe-manager-prebake:{self.version.version_string()}'
+        frappe_image = f'ghcr.io/rtcamp/frappe-manager-frappe:{self.version.version_string()}'
+
+        zshrc_path = bench.path / "workspace" / ".zshrc"
+        zshrc_bak_path = bench.path / "workspace" / ".bak.zshrc"
+
+        if not zshrc_path.exists():
+            richprint.change_head(f"Migrating .zshrc")
+            host_run_cp(
+                docker=bench.compose_project.docker,
+                image=frappe_image,
+                source="/opt/user/.zshrc",
+                destination=str(Path(bench.path / "workspace").absolute()),
+            )
+
+        zshrc_path.rename(zshrc_bak_path)
+        filtered_lines = []
+        for line in zshrc_bak_path.read_text().splitlines():
+            if not (
+                "PYENV_ROOT" in line
+                or "pyenv init" in line
+                or "NVM_DIR" in line
+            ):
+                filtered_lines.append(line)
+        zshrc_path.write_text("\n".join(filtered_lines) + "\n")
+        richprint.print(f"Migrated .zshrc")
+
+        if not bench.compose_project.compose_file_manager.exists():
+            richprint.error(f"Failed to migrate {bench.name} compose file.")
+            raise MigrationExceptionInBench(f"{bench.compose_project.compose_file_manager.compose_path} not found.")
+
+        # /workspace/.pyenv
+        richprint.change_head(f"Configuring Pyenv at /workspace/.pyenv")
+        host_run_cp(
+            docker=bench.compose_project.docker,
+            image=frappe_prebake_image,
+            source="/workspace/.pyenv",
+            destination=str(Path(bench.path / "workspace").absolute()),
+        )
+        richprint.print(f"Configured Pyenv at /workspace/.pyenv")
+
+        richprint.change_head(f"Configuring nvm at /workspace/.nvm")
+        host_run_cp(
+            docker=bench.compose_project.docker,
+            image=frappe_prebake_image,
+            source="/workspace/.nvm",
+            destination=str(Path(bench.path / "workspace").absolute()),
+        )
+        richprint.print(f"Configured nvm at /workspace/.nvm")
+
+        pyvenv_cfg = bench.path / "workspace" / "frappe-bench" / "env" / "pyvenv.cfg"
+        version_info = None
+
+        if pyvenv_cfg.exists():
+            with pyvenv_cfg.open("r") as f:
+                for line in f:
+                    if line.startswith("version"):
+                        version_info = line.split("=", 1)[1].strip()
+                        break
+
+        if version_info:
+            richprint.change_head(f"Migrating bench environment python v{version_info}")
+            output = bench.compose_project.docker.compose.run(
+                service="frappe",
+                command=f'-c "source /etc/bash.bashrc; pyenv install -s {version_info}; pyenv global {version_info};"',
+                rm=True,
+                entrypoint="/bin/bash",
+                stream=True,
+                user="frappe",
+            )
+            richprint.live_lines(output, padding=(0, 0, 0, 2))
+            output = bench.compose_project.docker.compose.run(
+                service="frappe",
+                command=f"-c 'source /etc/bash.bashrc; set -x; cd /workspace/frappe-bench; mv env env.bak; uv venv env --seed --link-mode=copy; for app in $(ls -1 apps); do uv pip install --python /workspace/frappe-bench/env/bin/python -U -e apps/$app; done'",
+                rm=True,
+                entrypoint="/bin/bash",
+                stream=True,
+                user="frappe",
+            )
+            richprint.live_lines(output, padding=(0, 0, 0, 2))
+            richprint.print(f"Migrated bench environment python v{version_info}")
+        self.split_supervisor_config(bench)
 
     def migrate_workers_compose(self, bench: MigrationBench):
         if bench.workers_compose_project.compose_file_manager.compose_path.exists():
@@ -103,3 +173,67 @@ class MigrationV0180(MigrationBase):
             bench.workers_compose_project.compose_file_manager.write_to_file()
 
             richprint.print(f"Migrated [blue]{bench.name}[/blue] workers compose file.")
+
+
+    def split_supervisor_config(self, bench: MigrationBench):
+        frappe_bench_dir = bench.path / 'workspace' / 'frappe-bench'
+        supervisor_conf_path: Path = frappe_bench_dir / "config" / "supervisor.conf"
+        richprint.change_head("Migrating supervisor configs")
+
+        bench_setup_supervisor_command = "bench setup supervisor --skip-redis --skip-supervisord --yes --user frappe"
+
+        output = bench.compose_project.docker.compose.run(
+            service="frappe",
+            command=f"-c 'source /etc/bash.bashrc; cd /workspace/frappe-bench; {bench_setup_supervisor_command}'",
+            rm=True,
+            entrypoint="/bin/bash",
+            stream=True,
+            user="frappe",
+        )
+
+        richprint.live_lines(output, padding=(0, 0, 0, 2))
+
+        import configparser
+        config = configparser.ConfigParser(allow_no_value=True, strict=False, interpolation=None)
+        config.read_string(supervisor_conf_path.read_text())
+
+        handle_symlink_frappe_dir = False
+
+        if frappe_bench_dir.is_symlink():
+            handle_symlink_frappe_dir = True
+
+        for section_name in config.sections():
+            if "group:" not in section_name:
+                section_config = configparser.ConfigParser(interpolation=None)
+                section_config.add_section(section_name)
+                for key, value in config.items(section_name):
+                    if handle_symlink_frappe_dir:
+                        to_replace = str(frappe_bench_dir.readlink())
+
+                        if to_replace in value:
+                            value = value.replace(to_replace, frappe_bench_dir.name)
+
+                    if "frappe-web" in section_name:
+                        if key == "command":
+                            value = value.replace("127.0.0.1:80", "0.0.0.0:80")
+                            cpu_count = os.cpu_count() or 2
+                            workers = (cpu_count * 2) + 1
+                            value = re.sub(r'-w\s+\d+', f'-w {workers}', value)
+
+                    section_config.set(section_name, key, value)
+
+                section_name_delimeter = '-frappe-'
+
+                if '-node-' in section_name:
+                    section_name_delimeter = '-node-'
+
+                file_name_prefix = section_name.split(section_name_delimeter)
+                file_name_prefix = file_name_prefix[-1]
+                file_name = file_name_prefix + ".fm.supervisor.conf"
+                if "worker" in section_name:
+                    file_name = file_name_prefix + ".workers.fm.supervisor.conf"
+                new_file: Path = supervisor_conf_path.parent / file_name
+                with open(new_file, "w") as section_file:
+                    section_config.write(section_file)
+
+                richprint.print(f"Migrated supervisor conf {section_name} => {file_name}")
