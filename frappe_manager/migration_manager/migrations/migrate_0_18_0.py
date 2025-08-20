@@ -83,12 +83,14 @@ class MigrationV0180(MigrationBase):
         zshrc_path = bench.path / "workspace" / ".zshrc"
         zshrc_bak_path = bench.path / "workspace" / ".bak.zshrc"
 
-        if not zshrc_path.exists():
-            richprint.change_head(f"Migrating .zshrc")
+        ohmyzsh_path = bench.path / "workspace" / ".oh-my-zsh"
+
+        if not ohmyzsh_path.exists():
+            richprint.change_head(f"Migrating .oh-my-zsh")
             host_run_cp(
                 docker=bench.compose_project.docker,
                 image=frappe_image,
-                source="/opt/user/.zshrc",
+                source="/workspace/.oh-my-zsh",
                 destination=str(Path(bench.path / "workspace").absolute()),
             )
 
