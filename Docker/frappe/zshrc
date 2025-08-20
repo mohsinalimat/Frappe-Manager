@@ -42,3 +42,4 @@ DIRSTACKSIZE=5
 DISABLE_UPDATE_PROMPT=true
 
 [[ -f ~/.zsh_aliases ]] && source ~/.zsh_aliases
+export PATH="/opt/user/.bin:$PATH"

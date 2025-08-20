@@ -128,7 +128,7 @@ WORKDIR /opt
 
 RUN mkdir -p /opt/user/conf.d && touch /opt/user/.profile && ls -lah
 
-ENV ZSH=/opt/user/.oh-my-zsh
+ENV ZSH=/workspace/.oh-my-zsh
 ENV DISABLE_UPDATE_PROMPT=true
 
 # install ohmyzsh
@@ -136,16 +136,15 @@ RUN sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master
 RUN unset ZSH
 
 COPY --chown=frappe:frappe ./zshrc /opt/user/.zshrc
-COPY --chown=frappe:frappe ./fm.zsh-theme /opt/user/fm.zsh-theme
+COPY --chown=frappe:frappe ./fm.zsh-theme /workspace/.oh-my-zsh/custom/themes/fm.zsh-theme
 COPY --chown=frappe:frappe ./fmx /opt/user/fmx
 
 RUN mkdir -p /workspace
 
 USER root
 RUN . /scripts/helper-function.sh && setup_pyenv_and_virtualenv ${PYENV_GIT_VERSION}
+RUN echo 'export PATH="/opt/user/.bin:$PATH"' >> /etc/bash.bashrc && echo 'export PATH="/opt/user/.bin:$PATH"' >> /etc/zsh/zshrc
 USER frappe
-
-# RUN . /scripts/helper-function.sh && pyenv_activate_default \
 
 RUN mkdir -p /opt/user/.bin \
     && python3 -m venv /opt/user/bench-venv \
@@ -162,8 +161,6 @@ USER frappe
 
 
 WORKDIR /workspace
-
-RUN echo 'export PATH="/opt/user/.bin:$PATH"' >> "$USERZSHRC"
 
 COPY --chown=frappe:frappe ./supervisord.conf /opt/user/
 COPY --chown=frappe:frappe ./frappe-dev.conf /opt/user/
@@ -186,6 +183,7 @@ COPY --from=prebake --chown=frappe:frappe /workspace/hrms /workspace/frappe-benc
 
 COPY --from=prebake --chown=frappe:frappe /workspace/.pyenv /workspace/.pyenv
 COPY --from=prebake --chown=frappe:frappe /workspace/.nvm /workspace/.nvm
+COPY --from=prebake --chown=frappe:frappe /workspace/.oh-my-zsh /workspace/.oh-my-zsh
 
 FROM bench AS fm_image
 
