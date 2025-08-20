@@ -1,4 +1,6 @@
 #!/bin/bash
+source /scripts/helper-function.sh
+
 set -e
 
 cleanup() {
@@ -16,7 +18,6 @@ emer() {
     exit 1
 }
 
-# fi
 if [[ -n "$BENCH_START_OFF" ]]; then
     tail -f /dev/null
 else

@@ -266,7 +266,6 @@ function nvm_activate() {
 }
 
 function pyenv_activate_default() {
-    set -x
     export PYTHON_VERSION="${PYTHON_VERSIONS%% *}"
     pyenv_activate
     pyenv global "$PYTHON_VERSION"
@@ -311,6 +310,15 @@ function setup_nvm_and_yarn() {
     chown -R frappe:frappe "$NVM_DIR"
 }
 
+get_pyvenv_version() {
+    local venv_cfg="$1"
+    local venv_version=""
+    if [[ -f "$venv_cfg" ]]; then
+        venv_version=$(grep "version_info" "$venv_cfg" | cut -d "=" -f 2 | tr -d ' ')
+    fi
+    echo "$venv_version"
+}
+
 function setup_pyenv_and_virtualenv() {
     set -x
     version="$1"
@@ -321,20 +329,18 @@ function setup_pyenv_and_virtualenv() {
     pyenv_activate
 
     venv_cfg="/workspace/frappe-branch/env/pyvenv.cfg"
-
-    if [[ -f "$venv_cfg" ]]; then
-        venv_version=$(grep "version_info" "$venv_cfg" | cut -d "=" -f 2 | tr -d ' ')
-        if [[ -n "$venv_version" ]]; then
-            echo "Found Python version in /workspace/frappe-branch/env/pyvenv.cfg: $venv_version"
-            pyenv install "$venv_version" || echo "Failed to install $venv_version via pyenv"
-        fi
+    venv_version=$(get_pyvenv_version "$venv_cfg")
+    PYTHON_VERSION="${PYTHON_VERSIONS%% *}"
+    if [[ -n "$venv_version" ]]; then
+        echo "Found Python version in /workspace/frappe-branch/env/pyvenv.cfg: $venv_version"
+        pyenv install "$venv_version" || echo "Failed to install $venv_version via pyenv"
+        PYTHON_VERSION="$venv_version"
     fi
 
     for version in ${PYTHON_VERSIONS}; do
         pyenv install "$version"
     done
 
-    PYTHON_VERSION="${PYTHON_VERSIONS%% *}"
     pyenv global "$PYTHON_VERSION"
 
     pip install --no-cache-dir virtualenv
@@ -352,11 +358,11 @@ function configure_workspace()
 {
     start_time=$(date +%s.%N)
 
-    if [[ ! -f "/workspace/.nvm" ]]; then
+    if [[ ! -d "/workspace/.nvm" ]]; then
         setup_nvm_and_yarn ${NVM_VERSION} false
     fi
 
-    if [[ ! -f "/workspace/.pyenv" ]]; then
+    if [[ ! -d "/workspace/.pyenv" ]]; then
         setup_pyenv_and_virtualenv ${PYENV_GIT_VERSION} false
     fi
 
