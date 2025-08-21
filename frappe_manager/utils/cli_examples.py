@@ -17,7 +17,7 @@ def get_examples_from_toml(
     file_data = toml_path.read_bytes()
     data: Dict[str, List[Dict[str, str]]] = json.loads(file_data)
 
-    bench_name = 'example.com'
+    bench_name = ''
 
     example_data = {'benchname': bench_name, 'default_version': frappe_version}
 
