@@ -33,7 +33,9 @@ Before restarting, check the current activity:
 
 **Quick check with bench:**
 ```bash
-bench doctor
+# default site
+bench doctor 
+
 # Or for a specific site:
 bench --site your.site.name doctor
 ```
