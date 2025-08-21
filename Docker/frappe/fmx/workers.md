@@ -54,8 +54,8 @@ Go to `/app/rq-jobs` in your Frappe site to view active jobs and queues.
 - Emergencies when you need services back ASAP
 - When no critical jobs are running
 
-**Pros:** Fast
-**Cons:** Jobs may be interrupted
+**Pros:** Fast  
+**Cons:** Jobs may be interrupted  
 
 ### 2. `fmx restart --wait-workers` (The Safe Option)
 
@@ -71,8 +71,8 @@ Go to `/app/rq-jobs` in your Frappe site to view active jobs and queues.
 - Before database migrations
 - Anytime data integrity matters
 
-**Pros:** Maximum safety, no job interruption
-**Cons:** Can take longer if jobs are lengthy
+**Pros:** Maximum safety, no job interruption  
+**Cons:** Can take longer if jobs are lengthy  
 
 ### 3. `fmx restart --no-wait-workers` (The Middle Ground)
 
@@ -87,19 +87,8 @@ Go to `/app/rq-jobs` in your Frappe site to view active jobs and queues.
 - Routine updates where service availability is a priority
 - Jobs are typically short-running
 
-**Pros:** Faster, provides some coordination
-**Cons:** No guarantee jobs finish before workers are replaced
-
-### 4. `fmx restart --suspend-rq` (The Coordinator)
-
-**What it does:**
-- Suspends job processing via a Redis flag
-- Performs a normal restart without waiting
-- Resumes job processing afterward
-
-**When to use:**
-- You want RQ coordination without waiting
-- Testing restart procedures
+**Pros:** Faster, provides some coordination  
+**Cons:** No guarantee jobs finish before workers are replaced  
 
 ## Database Migrations
 
