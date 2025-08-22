@@ -589,7 +589,7 @@ class ComposeFile:
             try:
                 image = self.yml["services"][service]["image"]
                 name, tag = image.split(":") if ":" in image else (image, "latest")
-                images[service] = {"name": name, "tag": tag}
+                images[service] = {"name": name, "tag": tag, "image": image}
             except KeyError:
                 pass
         return images

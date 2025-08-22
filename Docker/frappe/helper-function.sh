@@ -253,12 +253,124 @@ emer() {
 }
 
 
-configure_workspace()
+
+function nvm_activate_default() {
+    export NODE_VERSION="${NODE_VERSIONS%% *}"
+    nvm_activate
+}
+
+function nvm_activate() {
+     export NVM_DIR="$NVM_DIR"
+    [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+    [ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"
+}
+
+function pyenv_activate_default() {
+    export PYTHON_VERSION="${PYTHON_VERSIONS%% *}"
+    pyenv_activate
+    pyenv global "$PYTHON_VERSION"
+
+}
+
+function pyenv_activate() {
+    export PYENV_ROOT="$PYENV_ROOT"
+    command -v pyenv >/dev/null || export PATH="$PYENV_ROOT/bin:$PATH"
+    eval "$(pyenv init --path)"
+    pyenv versions
+}
+
+function setup_nvm_and_yarn() {
+    version="$1"
+
+    [[ "${version:-}" ]] || emer "[ERROR] Please provide nvm version as first argument."
+
+    mkdir -p "$NVM_DIR"
+
+    wget -qO- https://raw.githubusercontent.com/nvm-sh/nvm/v"$version"/install.sh | bash
+
+    . "${NVM_DIR}/nvm.sh"
+
+    for version in ${NODE_VERSIONS}; do
+        nvm install "$version"
+    done
+
+    NODE_VERSION="${NODE_VERSIONS%% *}"
+
+    nvm use "v${NODE_VERSION}"
+    nvm alias default "v${NODE_VERSION}"
+    npm install -g yarn
+
+    rm -rf "${NVM_DIR}/.cache"
+
+    if [[ "$2" != "false" ]]; then
+        sed -i '1i if [[ -d "$NVM_DIR" ]]; then [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"; [ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"; fi' /etc/bash.bashrc
+        sed -i '1i if [[ -d "$NVM_DIR" ]]; then [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"; [ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"; fi' /etc/zsh/zshrc
+    fi
+
+    chown -R frappe:frappe "$NVM_DIR"
+}
+
+get_pyvenv_version() {
+    local venv_cfg="$1"
+    local venv_version=""
+    if [[ -f "$venv_cfg" ]]; then
+        venv_version=$(grep "version_info" "$venv_cfg" | cut -d "=" -f 2 | tr -d ' ')
+    fi
+    echo "$venv_version"
+}
+
+function setup_pyenv_and_virtualenv() {
+    set -x
+    version="$1"
+    [[ "${version:-}" ]] || emer "[ERROR] Please provide pyenv version as first argument."
+
+    git clone --depth 1 --branch "v$version" https://github.com/pyenv/pyenv.git "$PYENV_ROOT"
+
+    pyenv_activate
+
+    venv_cfg="/workspace/frappe-branch/env/pyvenv.cfg"
+    venv_version=$(get_pyvenv_version "$venv_cfg")
+    PYTHON_VERSION="${PYTHON_VERSIONS%% *}"
+    if [[ -n "$venv_version" ]]; then
+        echo "Found Python version in /workspace/frappe-branch/env/pyvenv.cfg: $venv_version"
+        pyenv install "$venv_version" || echo "Failed to install $venv_version via pyenv"
+        PYTHON_VERSION="$venv_version"
+    fi
+
+    for version in ${PYTHON_VERSIONS}; do
+        pyenv install "$version"
+    done
+
+    pyenv global "$PYTHON_VERSION"
+
+    pip install --no-cache-dir virtualenv
+
+    if [[ "$2" != "false" ]]; then
+        sed -i '1i if [[ -d "$PYENV_ROOT" ]]; then export PYENV_ROOT="$PYENV_ROOT"; export PATH="$PYENV_ROOT/bin:$PATH"; eval "$(pyenv init --path)"; fi' /etc/bash.bashrc
+        sed -i '1i if [[ -d "$PYENV_ROOT" ]]; then export PYENV_ROOT="$PYENV_ROOT"; export PATH="$PYENV_ROOT/bin:$PATH"; eval "$(pyenv init --path)"; fi' /etc/zsh/zshrc
+    fi
+    find "$PYENV_ROOT/versions" -depth \( \( -type d -a \( -name test -o -name tests -o -name idle_test \) \) -o \( -type f -a \( -name '*.pyc' -o -name '*.pyo' -o -name 'libpython*.a' \) \) \) -exec rm -rf '{}' +
+
+    chown -R frappe:frappe "$PYENV_ROOT"
+}
+
+function configure_workspace()
 {
     start_time=$(date +%s.%N)
+
+    if [[ ! -d "/workspace/.nvm" ]]; then
+        setup_nvm_and_yarn ${NVM_VERSION} false
+    fi
+
+    if [[ ! -d "/workspace/.pyenv" ]]; then
+        setup_pyenv_and_virtualenv ${PYENV_GIT_VERSION} false
+    fi
+
     chown -R "$USERID":"$USERGROUP" /opt
+
     end_time=$(date +%s.%N)
     execution_time=$(awk "BEGIN {print $end_time - $start_time}")
+
     echo "Time taken for chown /opt : $execution_time seconds"
 
     if [[ ! -d "/workspace/.oh-my-zsh" ]]; then

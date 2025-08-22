@@ -173,7 +173,7 @@ class BenchConfig(BaseModel):
             "db_port": db_server_info.port,
             "redis_cache": f"redis://{self.container_name_prefix}{CLI_DEFAULT_DELIMETER}redis-cache:6379",
             "redis_queue": f"redis://{self.container_name_prefix}{CLI_DEFAULT_DELIMETER}redis-queue:6379",
-            "redis_socketio": f"redis://{self.container_name_prefix}{CLI_DEFAULT_DELIMETER}redis-socketio:6379",
+            "redis_socketio": f"redis://{self.container_name_prefix}{CLI_DEFAULT_DELIMETER}redis-cache:6379",
             "webserver_port": 80,
             "socketio_port": 80,
             "restart_supervisor_on_update": 0,

@@ -75,7 +75,7 @@ if [[ "${CHANGE_DIR:-}" ]];then
    cd "$CHANGE_DIR" || true
 fi
 
-source /opt/user/.zshrc
+source /env/bash.bashrc
 
 if $all_files_exist; then
     echo "$file_to_check populated within $total_iteration seconds."

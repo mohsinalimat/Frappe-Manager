@@ -26,7 +26,7 @@ from frappe_manager.utils.site import get_all_docker_images
 class BenchOperations:
     def __init__(self, bench) -> None:
         self.bench = bench
-        self.bench_cli_cmd = ["/opt/.pyenv/shims/bench"]
+        self.bench_cli_cmd = ['/opt/user/.bin/bench_orig']
         self.frappe_bench_dir: Path = self.bench.path / "workspace" / "frappe-bench"
 
     def create_fm_bench(self):
@@ -96,7 +96,6 @@ class BenchOperations:
             self.bench.services.database_manager.database_server_info.host: self.bench.services.database_manager.database_server_info.port,
             f"{self.bench.bench_config.container_name_prefix}{CLI_DEFAULT_DELIMETER}redis-cache": 6379,
             f"{self.bench.bench_config.container_name_prefix}{CLI_DEFAULT_DELIMETER}redis-queue": 6379,
-            f"{self.bench.bench_config.container_name_prefix}{CLI_DEFAULT_DELIMETER}redis-socketio": 6379,
         }
         for service, port in required_services.items():
             output: SubprocessOutput = self.wait_for_required_service(host=service, port=port)
@@ -117,6 +116,8 @@ class BenchOperations:
         service: str = 'frappe',
         compose_project_obj: Optional[ComposeProject] = None,
     ):
+        command = f"/bin/bash -c \'source /etc/bash.bashrc; {command}\'"
+
         if compose_project_obj:
             compose_project: ComposeProject = compose_project_obj
         else:
@@ -189,6 +190,8 @@ class BenchOperations:
 
         if self.frappe_bench_dir.is_symlink():
             handle_symlink_frappe_dir = True
+            symlink_target = str(self.frappe_bench_dir.readlink())
+            symlink_name = self.frappe_bench_dir.name
 
         for section_name in config.sections():
             if "group:" not in section_name:
@@ -203,13 +206,9 @@ class BenchOperations:
 
                     if "frappe-web" in section_name:
                         if key == "command":
-                            # Replace localhost binding with all interfaces
                             value = value.replace("127.0.0.1:80", "0.0.0.0:80")
-                            
-                            # Calculate optimal workers based on CPU count
-                            workers = (os.cpu_count() * 2) + 1
-                            
-                            # Replace worker count using regex
+                            cpu_count = os.cpu_count() or 2
+                            workers = (cpu_count * 2) + 1
                             value = re.sub(r'-w\s+\d+', f'-w {workers}', value)
                             
                     section_config.set(section_name, key, value)
@@ -219,16 +218,12 @@ class BenchOperations:
                 if '-node-' in section_name:
                     section_name_delimeter = '-node-'
 
-                file_name_prefix = section_name.split(section_name_delimeter)
-
-                file_name_prefix = file_name_prefix[-1]
+                file_name_prefix = section_name.split(section_name_delimeter)[-1]
                 file_name = file_name_prefix + ".fm.supervisor.conf"
-
                 if "worker" in section_name:
                     file_name = file_name_prefix + ".workers.fm.supervisor.conf"
 
                 new_file: Path = supervisor_conf_path.parent / file_name
-
                 with open(new_file, "w") as section_file:
                     section_config.write(section_file)
 
@@ -241,16 +236,18 @@ class BenchOperations:
         bench_dev_server_script_output = self.container_run("cat /opt/user/bench-dev-server", capture_output=True)
         import re
 
+        # Join with newline to preserve formatting
+        bench_dev_server_script = "\n".join(bench_dev_server_script_output.combined)
+
         if "host" in " ".join(bench_serve_help_output.combined):
             new_bench_dev_server_script = re.sub(
-                r"--port \d+", "--host 0.0.0.0 --port 80", " ".join(bench_dev_server_script_output.combined)
+                r"--port \d+", "--host 0.0.0.0 --port 80", bench_dev_server_script
             )
         else:
             new_bench_dev_server_script = re.sub(
-                r"--port \d+", "--port 80", " ".join(bench_dev_server_script_output.combined)
+                r"--port \d+", "--port 80", bench_dev_server_script
             )
-
-        self.container_run(f'echo "{new_bench_dev_server_script}" > /opt/user/bench-dev-server.sh')
+        self.container_run(f"echo '{new_bench_dev_server_script}' > /opt/user/bench-dev-server.sh")
         self.container_run("chmod +x /opt/user/bench-dev-server.sh", user='root')
 
     def bench_install_apps(self, apps_lists, already_installed_apps: Dict = STABLE_APP_BRANCH_MAPPING_LIST):
@@ -399,7 +396,7 @@ class BenchOperations:
         if not_available_images:
             for image in not_available_images:
                 richprint.error(f"Docker image '{image}' is not available locally")
-            raise BenchOperationRequiredDockerImagesNotAvailable(self.bench.name, 'fm self update images')
+            raise BenchOperationRequiredDockerImagesNotAvailable(self.bench.name, 'fm self update-images')
 
     def reset_bench_site(self, admin_password: str):
         global_db_info = self.bench.services.database_manager.database_server_info

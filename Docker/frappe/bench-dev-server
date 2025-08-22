@@ -1,4 +1,5 @@
 #!/bin/bash
+
 cleanup() {
     echo "Received signal SIGTERM, stopping..."
     if [ -n "$running_script_pid" ]; then
