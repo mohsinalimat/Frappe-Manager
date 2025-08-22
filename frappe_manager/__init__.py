@@ -69,12 +69,6 @@ DEFAULT_EXTENSIONS = [
     # JavaScript/Web
     "dbaeumer.vscode-eslint",
     "esbenp.prettier-vscode",
-
-    # General Development
-    "eamodio.gitlens",
-    "MS-vsliveshare.vsliveshare",
-    "visualstudioexptteam.vscodeintellicode",
-    "christian-kohler.path-intellisense",
 ]
 
 
@@ -84,7 +78,6 @@ class SiteServicesEnum(str, Enum):
     mariadb = "mariadb"
     redis_queue = "redis-queue"
     redis_cache = "redis-cache"
-    redis_socketio = "redis-socketio"
     schedule = "schedule"
     socketio = "socketio"
 

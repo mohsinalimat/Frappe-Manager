@@ -132,14 +132,12 @@ class MigrationBase(ABC):
         bench_site_config = bench.path / "workspace" / "frappe-bench" / "sites" / bench.name / "site_config.json"
         self.backup_manager.backup(bench_site_config, bench_name=bench.name)
 
-        server_db_info: DatabaseServerServiceInfo = DatabaseServerServiceInfo.import_from_compose_file(
-            'global-db', self.services_manager.compose_project
-        )
+        bench_db_info = DatabaseServerServiceInfo.import_from_bench(bench_path=bench.path,bench_name=bench.name,raise_exception=False)
 
         self.bench_db_backup(
             bench=bench,
-            server_db_info=server_db_info,
-            services_manager=self.services_manager,
+            db_info=bench_db_info,
+            compose_project=bench.compose_project,
             backup_manager=self.backup_manager,
         )
 
@@ -152,34 +150,30 @@ class MigrationBase(ABC):
     def bench_db_backup(
         self,
         bench: MigrationBench,
-        server_db_info: DatabaseServerServiceInfo,
-        services_manager: MigrationServicesManager,
+        db_info: DatabaseServerServiceInfo,
+        compose_project,
         backup_manager: BackupManager,
     ):
-        bench_db_info = bench.get_db_connection_info()
-        bench_db_name = bench_db_info["name"]
-
         richprint.change_head(f'Commencing db {bench.name} backup')
 
-        mariadb_manager = MariaDBManager(server_db_info, services_manager.compose_project)
+        mariadb_manager = MariaDBManager(db_info, compose_project, run_on_compose_service="frappe")
 
         from datetime import datetime
 
         current_datetime = datetime.now()
         formatted_date = current_datetime.strftime("%d-%m-%Y--%H-%M-%S")
 
-        container_backup_dir: Path = Path("/var/log/mysql")
-        host_backup_dir: Path = services_manager.services_path / 'mariadb' / 'logs'
+        host_backup_dir: Path = bench.path / "workspace" / ".cache"
         db_sql_file_name = f"db-{bench.name}-{formatted_date}.sql"
 
         host_db_sql_file_path: Path = host_backup_dir / db_sql_file_name
-        container_db_sql_file_path: Path = container_backup_dir / db_sql_file_name
+        container_db_sql_file_path: Path = Path("/workspace") / ".cache" / db_sql_file_name
 
         backup_gz_file_backup_data_path: Path = (
             bench.path / backup_manager.bench_backup_dir / self.version.version / f'{db_sql_file_name}.gz'
         )
 
-        mariadb_manager.db_export(bench_db_name, container_db_sql_file_path)
+        mariadb_manager.db_export(db_info.name, container_db_sql_file_path)
 
         import gzip
         import shutil

@@ -1,4 +1,5 @@
 #!/usr/bin/bash
+
 cleanup() {
     echo "Received signal, performing cleanup..."
     if [ -n "$nginx_pid" ]; then
@@ -11,7 +12,7 @@ cleanup() {
 trap cleanup SIGQUIT SIGTERM
 
 if ! [[ -f "/etc/nginx/conf.d/default.conf" ]]; then
-    /config/jinja2 -D SITENAME="$SITENAME" /config/template.conf > /etc/nginx/conf.d/default.conf
+    jinja2 -D SITENAME="$SITENAME" /config/template.conf > /etc/nginx/conf.d/default.conf
 fi
 
 nginx -g 'daemon off;' &

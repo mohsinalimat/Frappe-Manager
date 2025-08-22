@@ -1,4 +1,5 @@
 import time
+import json
 from pathlib import Path
 from typing import Dict, Any, Optional, Protocol, List, Union
 from frappe_manager.compose_project.compose_project import ComposeProject
@@ -11,6 +12,7 @@ from frappe_manager.services_manager.services_exceptions import (
     DatabaseServiceDBRemoveFailError,
     DatabaseServiceException,
     DatabaseServicePasswordNotFound,
+    DatabaseServiceQueryAccessDenied,
     DatabaseServiceStartTimeout,
     DatabaseServiceUserRemoveFailError,
 )
@@ -18,6 +20,7 @@ from frappe_manager.display_manager.DisplayManager import richprint
 from pydantic import BaseModel
 
 from frappe_manager.docker_wrapper.subprocess_output import SubprocessOutput
+from frappe_manager.site_manager.site_exceptions import BenchException
 
 
 # TODO this class will be used for validation for main config
@@ -26,10 +29,10 @@ class DatabaseServerServiceInfo(BaseModel):
     user: str
     port: int
     password: str
-    secret_path: Path
+    name: Optional[str] = None
 
     @classmethod
-    def import_from_compose_file(cls, compose_service_name: str, compose_project: ComposeProject):
+    def import_from_compose_file(cls, compose_service_name: str, compose_project: ComposeProject, raise_exception: bool = True):
         """
         Provides info about a database server
         """
@@ -45,13 +48,49 @@ class DatabaseServerServiceInfo(BaseModel):
         # secrets or password ?
         if 'MYSQL_ROOT_PASSWORD_FILE' in compose_service_envs:
             password_path: Path = compose_project.compose_file_manager.get_secret_file_path('db_root_password')
-            info['secret_path'] = password_path
             info["password"] = password_path.read_text()
         elif 'MYSQL_ROOT_PASSWORD' in compose_service_envs:
-            info['secret_path'] = 'env'
             info["password"] = compose_service_envs['MYSQL_ROOT_PASSWORD']
         else:
-            raise DatabaseServicePasswordNotFound(compose_service_name)
+            if raise_exception:
+                raise DatabaseServicePasswordNotFound(compose_service_name)
+
+        return cls(**info)
+
+    @classmethod
+    def import_from_bench(cls,bench_name: str, bench_path: Path, raise_exception = False):
+        """
+        Provides info about a database server
+        """
+
+        site_config_file: Path = bench_path / "workspace" / "frappe-bench" / "sites" / bench_name / "site_config.json"
+        common_site_config_file: Path = bench_path / "workspace" / "frappe-bench" / "sites" / 'common_site_config.json'
+
+        info: Dict[str, Any] = {}
+
+        info["name"] = str(bench_name).replace(".", "-")
+        info["user"] = str(bench_name).replace(".", "-")
+
+        info["password"] = None
+
+        if common_site_config_file.exists():
+            with open(common_site_config_file, "r") as f:
+                common_site_config = json.load(f)
+                if common_site_config:
+                    info["host"] = common_site_config.get("db_host")
+                    info["port"] = common_site_config.get("db_port")
+
+        if site_config_file.exists():
+            with open(site_config_file, "r") as f:
+                site_config = json.load(f)
+                if site_config:
+                    info["host"] = site_config.get("db_host")
+                    info["name"] = site_config["db_name"]
+                    info["user"] = site_config["db_name"]
+                    info["password"] = site_config["db_password"]
+
+        if raise_exception and not info["passoword"]:
+            raise BenchException(bench_name,f"Password for the db user doesn't exits in either {common_site_config_file.name},{site_config_file.name}")
 
         return cls(**info)
 
@@ -101,6 +140,25 @@ class MariaDBManager(DatabaseServiceManager):
         self.base_query = '-e '
         self.quiet = True
 
+    def _compose_exec_or_run(self, command: str, stream: bool = False, user: str = None, rm: bool = False, entrypoint: str = None):
+        """
+        Executes a command using compose.exec if the service is running,
+        otherwise uses compose.run.
+        """
+        if self.compose_project.is_service_running(self.run_on_compose_service):
+            return self.compose_project.docker.compose.exec(
+                self.run_on_compose_service, command=command, stream=stream
+            )
+        else:
+            return self.compose_project.docker.compose.run(
+                self.run_on_compose_service,
+                # command=command,
+                stream=stream,
+                user=user,
+                rm=rm,
+                entrypoint=command,
+            )
+
     def db_run_query(
         self, query: str, raise_exception_obj: Optional[DatabaseServiceException] = None, capture_output: bool = False
     ):
@@ -112,8 +170,11 @@ class MariaDBManager(DatabaseServiceManager):
         db_query = base_command + self.base_query + query
 
         try:
-            output = self.compose_project.docker.compose.exec(
-                self.run_on_compose_service, command=db_query, stream=not capture_output
+            output = self._compose_exec_or_run(
+                db_query,
+                stream=not capture_output,
+                user="frappe",
+                rm=True,
             )
             if capture_output:
                 return output
@@ -135,8 +196,12 @@ class MariaDBManager(DatabaseServiceManager):
     def is_db_running(self) -> bool:
         db_started_command = f"mysqladmin  -P{self.database_server_info.port} -h{self.database_server_info.host} -u'{self.database_server_info.user}' -p'{self.database_server_info.password}' ping"
         try:
-            output = self.compose_project.docker.compose.exec(
-                self.run_on_compose_service, command=db_started_command, stream=False
+            output = self._compose_exec_or_run(
+                db_started_command,
+                stream=False,
+                user="frappe",
+                rm=True,
+                entrypoint=None,
             )
             return 'mysqld is alive' in " ".join(output.stdout)
         except DockerException as e:
@@ -169,12 +234,18 @@ class MariaDBManager(DatabaseServiceManager):
         db_exits_exception = DatabaseServiceException(
             self.database_server_info.host, 'Failed to get list of all databases.'
         )
-        output: SubprocessOutput = self.db_run_query(db_exits_commmand, db_exits_exception, capture_output=True)
-        return output.stdout
+        try:
+            output: SubprocessOutput = self.db_run_query(db_exits_commmand, capture_output=True)
+            return output.stdout
+        except DockerException as e:
+            if "access denied" in " ".join(e.output.combined).lower():
+                raise DatabaseServiceQueryAccessDenied(db_exits_commmand)
+        raise db_exits_exception
 
     def check_db_exists(self, db_name: str):
         databases = self.get_all_databases()
         return db_name in databases
+
 
     def remove_user(self, db_user: str, db_user_host: str = '%', remove_all_host: bool = False):
         users = {db_user: db_user_host}
@@ -223,8 +294,12 @@ class MariaDBManager(DatabaseServiceManager):
         db_export_command = f"mysqldump -u'{self.database_server_info.user}' -p'{self.database_server_info.password}' -h'{self.database_server_info.host}' -P{self.database_server_info.port} {db_name} --result-file={export_file_path}"
 
         try:
-            output = self.compose_project.docker.compose.exec(
-                self.run_on_compose_service, command=db_export_command, stream=False
+            output = self._compose_exec_or_run(
+                db_export_command,
+                stream=False,
+                user="frappe",
+                rm=True,
+                entrypoint=db_export_command,
             )
         except DockerException:
             raise DatabaseServiceDBExportFailed(self.run_on_compose_service, db_name)
@@ -249,8 +324,12 @@ class MariaDBManager(DatabaseServiceManager):
 
         try:
             output = self.compose_project.docker.compose.cp(source, destination, stream=False)
-            output = self.compose_project.docker.compose.exec(
-                self.run_on_compose_service, command=db_import_command, stream=False
+            output = self._compose_exec_or_run(
+                db_import_command,
+                stream=False,
+                user="frappe",
+                rm=True,
+                entrypoint=None,
             )
         except DockerException:
             raise DatabaseServiceDBImportFailed(self.run_on_compose_service, source)

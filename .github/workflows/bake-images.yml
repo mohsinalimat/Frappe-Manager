@@ -4,6 +4,12 @@ on:
   schedule:
     - cron: '0 2 * * *'
   workflow_dispatch:
+    inputs:
+      use_cache:
+        description: 'Use Docker build cache'
+        required: false
+        type: boolean
+        default: true
   push:
     tags:
       - v*
@@ -28,6 +34,18 @@ jobs:
         uses: actions/checkout@v3
         with:
           fetch-depth: 0
+
+      - name: Set USE_CACHE variable
+        run: |
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            if [[ "${{ github.event.inputs.use_cache }}" == "true" ]]; then
+              echo "USE_CACHE=true" >> $GITHUB_ENV
+            else
+              echo "USE_CACHE=false" >> $GITHUB_ENV
+            fi
+          else
+            echo "USE_CACHE=true" >> $GITHUB_ENV
+          fi
 
       - name: Checkout latest tag when job is schedule or push
         if: github.event_name == 'schedule' || github.event_name == 'push'
@@ -74,6 +92,10 @@ jobs:
           echo "prebake_image_name=ghcr.io/${owner}/frappe-manager-prebake:$(basename ${{ matrix.platform }})-${tag}" >> $GITHUB_ENV
           echo "fm_image_name=ghcr.io/${owner}/frappe-manager-${{ matrix.service_name }}:$(basename ${{ matrix.platform }})-${tag}" >> $GITHUB_ENV
 
+      - name: Set owner
+        run: |
+          echo "owned=$( echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]' )" >> $GITHUB_ENV
+
       - name: Build and push Docker image (non-frappe)
         if: matrix.service_name != 'frappe'
         uses: docker/build-push-action@v4
@@ -83,6 +105,8 @@ jobs:
           platforms: ${{ matrix.platform }}
           tags: ${{ env.image_name }}
           provenance: false
+          cache-from: ${{ env.USE_CACHE == 'true' && format('type=registry,ref=ghcr.io/{0}/frappe-manager-{1}:buildcache', env.owned, matrix.service_name) || '' }}
+          cache-to: ${{ format('type=registry,ref=ghcr.io/{0}/frappe-manager-{1}:buildcache,mode=max', env.owned, matrix.service_name) || '' }}
 
       - name: Build and push prebake image
         if: matrix.service_name == 'frappe'
@@ -94,6 +118,8 @@ jobs:
           tags: ${{ env.prebake_image_name }}
           target: prebake_image
           provenance: false
+          cache-from: ${{ env.USE_CACHE == 'true' && format('type=registry,ref=ghcr.io/{0}/frappe-manager-prebake:buildcache', env.owned) || '' }}
+          cache-to: ${{ format('type=registry,ref=ghcr.io/{0}/frappe-manager-prebake:buildcache,mode=max', env.owned) || '' }}
 
       - name: Build and push fm image
         if: matrix.service_name == 'frappe'
@@ -105,6 +131,13 @@ jobs:
           tags: ${{ env.fm_image_name }}
           target: fm_image
           provenance: false
+          cache-from: ${{ env.USE_CACHE == 'true' && format('type=registry,ref=ghcr.io/{0}/frappe-manager-frappe:buildcache', env.owned) || '' }}
+          cache-to: ${{ format('type=registry,ref=ghcr.io/{0}/frappe-manager-frappe:buildcache,mode=max', env.owned) || '' }}
+
+      - name: Prune buildx cache (self-hosted only)
+        if: startsWith(matrix.os, 'self-hosted')
+        run: |
+          docker buildx prune -af
 
   combine:
     name: Combine both platform images

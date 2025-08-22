@@ -1,0 +1,64 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "fmx"
+version = "0.3.0"
+authors = [
+  { name="fmx - fm container helper cli", email="sys@rtcamp.com" },
+]
+description = "A CLI tool to interact with supervisord instances managed by Frappe-Manager."
+readme = "README.md"
+license = { file="LICENSE" }
+requires-python = ">=3.8"
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "Intended Audience :: System Administrators",
+    "License :: OSI Approved :: MIT License", # Confirm license
+    "Operating System :: POSIX :: Linux",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: System :: Systems Administration",
+    "Topic :: Utilities",
+]
+
+dependencies = [
+    "typer>=0.16.0",
+    "rich>=13.0.0,<15.0.0",
+    "supervisor>=4.2.0,<5.0.0",
+    "redis>=6.1.1",
+    "rq>=2.3.3",
+]
+
+[project.urls]
+"Homepage" = "https://github.com/rtCamp/Frappe-Manager"
+"Repository" = "https://github.com/rtCamp/Frappe-Manager"
+"Bug Tracker" = "https://github.com/rtCamp/Frappe-Manager/issues"
+
+[project.scripts]
+fmx = "fmx.cli:main"
+
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["fmx*"]
+exclude = ["tests*"]
+
+[tool.setuptools.package-data]
+"fmx" = ["py.typed"]
+
+[dependency-groups]
+dev = [
+    "nuitka>=2.7.12",
+]
+
+[tool.setuptools]
+zip-safe = false
+py-modules = []

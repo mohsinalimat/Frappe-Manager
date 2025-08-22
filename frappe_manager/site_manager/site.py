@@ -337,7 +337,7 @@ class Bench:
             "db_port": services_db_port,
             "redis_cache": f"redis://{container_prefix}{CLI_DEFAULT_DELIMETER}redis-cache:6379",
             "redis_queue": f"redis://{container_prefix}{CLI_DEFAULT_DELIMETER}redis-queue:6379",
-            "redis_socketio": f"redis://{container_prefix}{CLI_DEFAULT_DELIMETER}redis-socketio:6379",
+            "redis_socketio": f"redis://{container_prefix}{CLI_DEFAULT_DELIMETER}redis-cache:6379",
         }
         self.set_common_bench_config(common_site_config_data)
 
@@ -837,7 +837,7 @@ class Bench:
 
         richprint.stop()
 
-        non_bash_supported = ["redis-cache", "redis-socketio", "redis-queue"]
+        non_bash_supported = ["redis-cache", "redis-queue"]
 
         shell_path = "/bin/bash" if compose_service not in non_bash_supported else "sh"
 
@@ -1090,22 +1090,22 @@ class Bench:
         """
 
         bench_db_info = self.get_db_connection_info()
-        richprint.change_head("Removing bench db and db users")
+        richprint.change_head("Removing bench db and db users from global-db")
         if "name" in bench_db_info:
             db_name = bench_db_info["name"]
             db_user = bench_db_info["user"]
 
             if not self.services.database_manager.check_db_exists(db_name):
-                richprint.warning(f"Bench db [blue]{db_name}[/blue] not found. Skipping...")
+                richprint.warning(f"global-db: Bench db [blue]{db_name}[/blue] not found. Skipping...")
             else:
                 self.services.database_manager.remove_db(db_name)
-                richprint.print(f"Removed bench db [blue]{db_name}[/blue].")
+                richprint.print(f"global-db: Removed bench db [blue]{db_name}[/blue].")
 
             if not self.services.database_manager.check_user_exists(db_user):
-                richprint.warning(f"Bench db user [blue]{db_user}[/blue] not found. Skipping...")
+                richprint.warning(f"global-db: Bench db user [blue]{db_user}[/blue] not found. Skipping...")
             else:
                 self.services.database_manager.remove_user(db_user, remove_all_host=True)
-                richprint.print(f"Removed bench db users [blue]{db_user}[/blue].")
+                richprint.print(f"global-db: Removed bench db users [blue]{db_user}[/blue].")
 
     def remove_bench(self, default_choice: bool = True):
         """

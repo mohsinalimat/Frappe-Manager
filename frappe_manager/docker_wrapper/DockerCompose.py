@@ -332,6 +332,7 @@ class DockerComposeWrapper:
         service: str,
         command: Optional[str] = None,
         name: Optional[str] = None,
+        user: Optional[str] = None,
         detach: bool = False,
         rm: bool = False,
         entrypoint: Optional[str] = None,

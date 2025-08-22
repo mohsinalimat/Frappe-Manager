@@ -11,7 +11,10 @@ emer() {
     exit 1
 }
 
-BENCH_COMMAND='/opt/.pyenv/shims/bench'
+BENCH_COMMAND='/opt/user/.bin/bench_orig'
+
+pyenv_activate_default
+nvm_activate_default
 
 configure_common_site_config(){
     $BENCH_COMMAND config dns_multitenant on
@@ -34,9 +37,9 @@ bench_serve_help_output=$($BENCH_COMMAND serve --help)
 host_changed=$(echo "$bench_serve_help_output" | grep -c 'host' || true)
 
 if [[ "$host_changed" -ge 1 ]]; then
-    awk -v a="$WEB_PORT" '{sub(/--port [[:digit:]]+/,"--host 0.0.0.0 --port "a); print}' /opt/user/bench-dev-server > file.tmp && mv file.tmp /opt/user/bench-dev-server.sh
+    awk -v a="$WEB_PORT" 'BEGIN{ORS=OFS=""} {sub(/--port [[:digit:]]+/,"--host 0.0.0.0 --port "a); print $0,"\n"}' /opt/user/bench-dev-server > file.tmp && mv file.tmp /opt/user/bench-dev-server.sh
 else
-    awk -v a="$WEB_PORT" '{sub(/--port [[:digit:]]+/,"--port "a); print}' /opt/user/bench-dev-server > file.tmp && mv file.tmp /opt/user/bench-dev-server.sh
+    awk -v a="$WEB_PORT" 'BEGIN{ORS=OFS=""} {sub(/--port [[:digit:]]+/,"--port "a); print $0,"\n"}' /opt/user/bench-dev-server > file.tmp && mv file.tmp /opt/user/bench-dev-server.sh
 fi
 
 chmod +x /opt/user/bench-dev-server.sh
